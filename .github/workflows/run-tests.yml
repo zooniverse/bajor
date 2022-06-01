@@ -22,9 +22,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'poetry'
-    - name: Install dependencies
+    - name: Install dependencies and Run Tests
       run: |
         poetry config virtualenvs.create true --local
+        poetry env use ${{ matrix.python-version }}
         poetry install
-    - name: Run tests
-      run: poetry run pytest
+        poetry run pytest
