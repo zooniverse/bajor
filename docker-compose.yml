@@ -6,9 +6,11 @@ services:
       context: .
       args:
         REVISION: 123-fake-revision-456
-        INSTALL_DEV: 'true'
+        INSTALL_DEV: true
     volumes:
       - ./:/usr/src/bajor
     environment:
       - AZURE_STORAGE_ACCOUNT_NAME=${AZURE_STORAGE_ACCOUNT_NAME}
       - AZURE_STORAGE_ACCESS_KEY=${AZURE_STORAGE_ACCESS_KEY}
+    ports:
+      - 8000:8000
