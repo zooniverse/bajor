@@ -23,3 +23,5 @@ We only support running BaJoR via Docker and Docker Compose. If you'd like to ru
 2. `docker-compose up` to start the containers
 
     * Alternatively use the following command to start a bash terminal session in the container `docker compose run --service-ports --rm api bash`
+
+    * Run the tests in the container `docker compose run --service-ports --rm api poetry run pytest`
