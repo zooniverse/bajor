@@ -25,6 +25,4 @@ jobs:
     - name: Install dependencies
       run: poetry install
     - name: Run tests
-      run: |
-        poetry config virtualenvs.create true --local
-        poetry run pytest
+      run: poetry run pytest
