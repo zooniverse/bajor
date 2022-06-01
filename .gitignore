@@ -14,5 +14,5 @@
 # ignore the annoying mac finder metadata file
 .DS_Store
 
-# ingore any
+# ingore compiled byte code files
 __pycache__/
