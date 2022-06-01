@@ -6,6 +6,8 @@ authors = ["Cam Allen <contact@zooniverse.org>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+fastapi = "^0.78.0"
+uvicorn = {extras = ["standard"], version = "^0.17.6"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
