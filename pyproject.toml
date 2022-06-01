@@ -14,6 +14,7 @@ pytest = "^7.1.2"
 
 [tool.poetry.scripts]
 start = "bajor.main:start_app"
+dev = "bajor.main:start_dev_app"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
