@@ -24,7 +24,7 @@ jobs:
         cache: 'poetry'
     - name: Install dependencies
       run: |
-        poetry config virtualenvs.create true
+        poetry config virtualenvs.create true --local
         poetry env use ${{ matrix.python-version }}
         poetry install
     - name: Run tests
