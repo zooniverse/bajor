@@ -16,3 +16,6 @@
 
 # ingore compiled byte code files
 __pycache__/
+
+# ignore env files for docker-compose setup
+env*.list
