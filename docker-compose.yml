@@ -9,6 +9,8 @@ services:
         INSTALL_DEV: true
     volumes:
       - ./:/usr/src/bajor
+    env_file:
+      - env.list
     environment:
       - AZURE_STORAGE_ACCOUNT_NAME=${AZURE_STORAGE_ACCOUNT_NAME}
       - AZURE_STORAGE_ACCESS_KEY=${AZURE_STORAGE_ACCESS_KEY}
