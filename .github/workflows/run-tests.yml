@@ -21,7 +21,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install poetry
       run: pipx install poetry
-    - name: Install dependencies and run tests
+    - name: Install dependencies
       run: |
-          poetry install
-          poetry run pytest
+        poetry env use "3.10"
+        poetry install
+    - name: Run tests
+      run: |
+        poetry env use "3.10"
+        poetry run pytest
