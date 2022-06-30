@@ -28,4 +28,7 @@ jobs:
       run: |
         poetry env info
         poetry env list
+        poetry env use 3.10
+        poetry env info
+        poetry env list
         poetry run pytest
