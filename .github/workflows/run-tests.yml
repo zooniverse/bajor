@@ -23,13 +23,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'poetry'
     - name: Install dependencies
-      run: poetry install
+      run: |
+        poetry env use ${{ matrix.python-version }}
+        poetry install
     - name: Run tests
       run: |
-        poetry env info
-        poetry env list
-        ls -al /opt/hostedtoolcache/Python/3.10.5/x64/
-        poetry env use /opt/hostedtoolcache/Python/3.10.5/x64/python
         poetry env info
         poetry env list
         poetry run pytest
