@@ -19,7 +19,6 @@ RUN pip install --upgrade pip
 RUN pip install poetry
 
 COPY pyproject.toml ./
-COPY poetry.toml ./
 COPY poetry.lock ./
 
 # Allow installing dev dependencies to run tests
