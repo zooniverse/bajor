@@ -49,7 +49,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     job_submission_timestamp = get_utc_time()
 
     log.info('server_job, create_batch_job, using manifest from path: {}'.format(manifest_container_path))
-    # TODO: add job completed / error reporting for job tracking data model (pgserver / sqlite?)
+    # TODO: add job completed / error reporting for job tracking data model (pgserver / redis / sqlite?)
+    # or possibly use container storage entires or even maybe container table storage
     #   if len(image_paths) == 0:
     #       job_status = get_job_status(
     #           'completed', '0 images found in provided list of images.')
@@ -102,9 +103,8 @@ def training_job_logs_path(job_id, task_id, suffix):
   return f'training_jobs/job_{job_id}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 def create_job_tasks(job_id, task_id=1):
-    # for persisting stdout and stderr
+    # for persisting stdout and stderr log files in container storage
     container_sas_url = storage_container_sas_url()
-
     # persist stdout and stderr (will be removed when node removed)
     # paths are relative to the Task working directory
     stderr_destination = OutputFileDestination(
@@ -138,30 +138,20 @@ def create_job_tasks(job_id, task_id=1):
     ]
 
     tasks = []
-    # TODO: this will move to the zoobot cmds
-    # mount_point = os.environ['AZ_BATCH_NODE_MOUNTS_DIR']
-    # command = '/bin/bash -c \"echo $AZ_BATCH_NODE_MOUNTS_DIR && echo $CONTAINER_MOUNT_DIR && echo $MANIFEST_PATH\" '
-    # command = '/bin/bash -c \"pwd && ls -alh /usr/src/zoobot/\" '
+    # ZOOBOT command for catalogue based training!
+    # Note: Zoobot was baked into the conatiner the Azure batch VM
+    # via the batch nodepool - see notes on panoptes-python-notebook
+    # OR
+    # TODO: add links to the Batch Scheduling system setup
+    #       container for zoobot built in etc to show how this works
+    # TODO: figure out how to avoid 0 byte file artifacts being created on storage conatiners
+    #       from the mkdir cmd - maybe just write a file in the nested conatiner paths where it's needed?
+    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} && python /usr/src/zoobot/train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} --epochs 3 --batch-size 5 --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
-    # ZOOBOT CMD for catalogue training!
-    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} && python /usr/src/zoobot/train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} --accelerator cpu --epochs 3 --batch-size 5 --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
-
-    # test the cuda install
+    # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
 
-
-    # TODO: check the artifacts being created on storage conatiners
-
-
-    # COMMANDS TO RUN
-    # 1. ensure the manifest_container_path file has data in it to avoid training on the default existing cataglogue only
-    # TODO: read and check the manifest_container_path has data
-    #
-    # extract the ^ to a script that we can all from the task / via the mounted storage system
-    #
-    # 2. count the number of manifest entries for reporting
-    # number_of_manifest_entries = 0
-
+    # create a job task to run the Zoobot training system command
     task = TaskAddParameter(
         id=str(task_id),
         command_line=command,
@@ -178,11 +168,12 @@ def create_job_tasks(job_id, task_id=1):
 
     for task_result in collection_results.value:
         if task_result.status is not TaskAddStatus.success:
-            # actually we should probably only re-submit if it's a server_error
-            # task_ids_failed_to_submit.append(task_result.task_id)
             log.info(f'task {task_result.task_id} failed to submitted. '
                      f'status: {task_result.status}, error: {task_result.error}')
 
+
+def active_jobs_running():
+  return len(get_batch_job_list()) > 0
 
 def get_batch_job_list(job_list_options=JobListOptions(
     filter='state eq \'active\'',
@@ -191,13 +182,16 @@ def get_batch_job_list(job_list_options=JobListOptions(
     jobs_generator = azure_batch_client().job.list(
         job_list_options=job_list_options)
     jobs_list = [j for j in jobs_generator]
-    log.info('Active batch jobs list')
-    log.info(jobs_list)
+    return jobs_list
 
-if __name__ == '__main__':
-    job_id = str(uuid.uuid4())
+def list_active_jobs():
+  log.info('Active batch jobs list')
+  log.info(get_batch_job_list())
+
+def schedule_job(job_id):
     # Zoobot Azure Batch pool ID
     pool_id = os.getenv('POOL_ID', 'gz_training_staging_0')
+
     # TODO: allow this manifest path to be set via an API query / post param
     manifest_path = os.getenv(
         'MANIFEST_PATH', 'training_catalogues/workflow-3598-2022-06-24T14:18:16+00:00.csv')
@@ -205,9 +199,17 @@ if __name__ == '__main__':
     # remove level or set the for more info
     setup_stdout_logging(logging.INFO)
 
-    # get_batch_job_list()
-    create_batch_job(job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
-    create_job_tasks(job_id=job_id)
+    if active_jobs_running():
+      log.warning(
+          'Active Jobs are running in the batch system - please wait till they are fininshed processing.')
+    else:
+      log.warning('No active jobs running - lets get scheduling!')
+      create_batch_job(
+          job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
+      create_job_tasks(job_id=job_id)
 
 
+if __name__ == '__main__':
+    job_id = str(uuid.uuid4())
+    schedule_job(job_id)
 
