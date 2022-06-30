@@ -25,4 +25,7 @@ jobs:
     - name: Install dependencies
       run: poetry install
     - name: Run tests
-      run: poetry run pytest
+      run: |
+        poetry env info
+        poetry env list
+        poetry run pytest
