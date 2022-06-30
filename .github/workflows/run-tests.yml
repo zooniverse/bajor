@@ -28,7 +28,8 @@ jobs:
       run: |
         poetry env info
         poetry env list
-        poetry env use 3.10
+        ls -al /opt/hostedtoolcache/Python/3.10.5/x64/
+        poetry env use /opt/hostedtoolcache/Python/3.10.5/x64/python
         poetry env info
         poetry env list
         poetry run pytest
