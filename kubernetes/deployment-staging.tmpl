@@ -49,6 +49,8 @@ spec:
           envFrom:
           - secretRef:
               name: bajor-common-env-vars
+          - secretRef:
+              name: bajor-staging-api-env-vars
 ---
 apiVersion: v1
 kind: Service
