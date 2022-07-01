@@ -200,7 +200,7 @@ def schedule_job(job_id, manifest_path):
       msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
       log.debug(msg)
       submitted_job_id = None
-      job_task_submission_status = task_submission_status(state='error', message='msg')
+      job_task_submission_status = task_submission_status(state='error', message=msg)
     else:
       log.debug('No active jobs running - lets get scheduling!')
       submitted_job_id = create_batch_job(
