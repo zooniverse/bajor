@@ -196,18 +196,11 @@ def schedule_job(job_id, manifest_path):
     # Zoobot Azure Batch pool ID
     pool_id = os.getenv('POOL_ID', 'gz_training_staging_0')
 
-    if active_jobs_running():
-      msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
-      log.debug(msg)
-      submitted_job_id = None
-      job_task_submission_status = task_submission_status(state='error', message=msg)
-    else:
-      log.debug('No active jobs running - lets get scheduling!')
-      submitted_job_id = create_batch_job(
-          job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
-      job_task_submission_status = create_job_tasks(job_id=job_id)
+    submitted_job_id = create_batch_job(
+        job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
+    job_task_submission_status = create_job_tasks(job_id=job_id)
 
-    # return the submitted job_id and task submission status tuple
+    # return the submitted job_id and task submission status dict
     return { "submitted_job_id": submitted_job_id, "job_task_status": job_task_submission_status }
 
 

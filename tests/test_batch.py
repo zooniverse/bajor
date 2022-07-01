@@ -1,36 +1,24 @@
-from bajor.batch import schedule_job, create_batch_job, create_job_tasks
+from bajor.batch import schedule_job, create_batch_job, create_job_tasks, active_jobs_running
 import uuid, os
 from unittest import mock
 
 fake_job_id = str(uuid.uuid4())
 
-@mock.patch('bajor.batch.active_jobs_running')
+@mock.patch('bajor.batch.get_batch_job_list')
+def test_active_jobs_running(mock_get_batch_job_list):
+    mock_get_batch_job_list.return_value = ["FakeJob"]
+    assert(active_jobs_running() == True)
+
 @mock.patch('bajor.batch.create_batch_job')
 @mock.patch('bajor.batch.create_job_tasks')
-def test_active_jobs_running(mock_create_job_tasks, mock_create_batch_job, mock_active_jobs_running):
-    mock_active_jobs_running.return_value = True
+def test_no_active_jobs(mock_create_job_tasks, mock_create_batch_job):
     schedule_job(fake_job_id, 'fake-manifest.csv')
-    mock_active_jobs_running.assert_called_once()
-    mock_create_batch_job.assert_not_called()
-    mock_create_job_tasks.assert_not_called()
-
-
-@mock.patch('bajor.batch.active_jobs_running')
-@mock.patch('bajor.batch.create_batch_job')
-@mock.patch('bajor.batch.create_job_tasks')
-def test_no_active_jobs(mock_create_job_tasks, mock_create_batch_job, mock_active_jobs_running):
-    mock_active_jobs_running.return_value = False
-    schedule_job(fake_job_id, 'fake-manifest.csv')
-    mock_active_jobs_running.assert_called_once()
     mock_create_batch_job.assert_called_once_with(job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='gz_training_staging_0')
     mock_create_job_tasks.assert_called_once_with(job_id=fake_job_id)
 
-
-@mock.patch('bajor.batch.active_jobs_running')
 @mock.patch('bajor.batch.create_batch_job')
 @mock.patch('bajor.batch.create_job_tasks')
-def test_schedule_job(mock_create_job_tasks, mock_create_batch_job, mock_active_jobs_running):
-    mock_active_jobs_running.return_value = False
+def test_schedule_job(mock_create_job_tasks, mock_create_batch_job):
     submitted_job_id = 'fake-job-id'
     job_task_status = {"status": 'submitted',
         "message": 'Job submitted successfully'}
