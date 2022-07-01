@@ -33,7 +33,7 @@ def test_no_active_jobs(mock_create_job_tasks, mock_create_batch_job, mock_activ
 def test_schedule_job(mock_create_job_tasks, mock_create_batch_job, mock_active_jobs_running):
     mock_active_jobs_running.return_value = False
     submitted_job_id = 'fake-job-id'
-    job_task_status = {"task_submission_status": {"status": 'submitted', "message": 'job has been submitted for processing'}}
+    job_task_status = {"status": 'submitted', "message": 'job has been submitted for processing'}
     mock_create_batch_job.return_value = submitted_job_id
     mock_create_job_tasks.return_value = job_task_status
     expected_result_dict = {

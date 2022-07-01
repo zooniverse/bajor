@@ -174,7 +174,7 @@ def create_job_tasks(job_id, task_id=1):
 
 
 def task_submission_status(state, message='Job submitted successfully'):
-    return {"task_submission_status": {"status": state, "message": message}}
+    return {"status": state, "message": message}
 
 def active_jobs_running():
   return len(get_batch_job_list()) > 0
