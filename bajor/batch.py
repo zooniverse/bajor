@@ -146,6 +146,7 @@ def create_job_tasks(job_id, task_id=1):
     #       container for zoobot built in etc to show how this works
     # TODO: figure out how to avoid 0 byte file artifacts being created on storage conatiners
     #       from the mkdir cmd - maybe just write a file in the nested conatiner paths where it's needed?
+    # TODO: ensure we pass the original decals 5 training catalog as well (staging will use a sample, production the whole shebang)
     command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} && python /usr/src/zoobot/train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} --epochs 3 --batch-size 5 --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
