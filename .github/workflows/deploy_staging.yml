@@ -1,0 +1,55 @@
+name: Deploy to Staging
+
+on:
+  workflow_run:
+    workflows: [Zooni CI]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check_ci_ok:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - run: |
+          echo 'The triggering CI tests workflow is ok'
+          exit 0
+
+  build_and_push_image:
+    name: Build and Push Image
+    uses: zooniverse/ci-cd/.github/workflows/build_and_push_image.yaml@main
+    needs: check_ci_ok
+    with:
+      repo_name: bajor
+      commit_id: ${{ github.sha }}
+      latest: true
+      build_args: "REVISION=${{ github.sha }}"
+
+  deploy_staging:
+    name: Deploy to Staging
+    uses: zooniverse/ci-cd/.github/workflows/deploy_app.yaml@main
+    needs: build_and_push_image
+    with:
+      app_name: bajor-staging-app
+      repo_name: bajor
+      commit_id: ${{ github.sha }}
+      environment: staging
+    secrets:
+      creds: ${{ secrets.AZURE_AKS }}
+
+  slack_notification:
+    name: Slack notification
+    uses: zooniverse/ci-cd/.github/workflows/slack_notification.yaml@main
+    needs: deploy_staging
+    if: always()
+    with:
+      commit_id: ${{ github.sha }}
+      job_name: Deploy to Staging / deploy_app
+      status: ${{ needs.deploy_staging.result }}
+      title: "BaJoR API Staging deploy complete"
+      title_link: "https://bajor-staging.zooniverse.org"
+    secrets:
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
