@@ -1,4 +1,3 @@
-import pdb
 from bajor.batch import schedule_job, create_batch_job, create_job_tasks
 import uuid, os
 from unittest import mock
