@@ -3,9 +3,14 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
+from logging.config import dictConfig
+from bajor.batch import schedule_job
+from bajor.log_config import log_config
 
 if os.getenv('DEBUG'):
   import pdb
+
+dictConfig(log_config)
 
 # add the basic auth setup
 # https://fastapi.tiangolo.com/advanced/security/http-basic-auth/#simple-http-basic-auth
@@ -32,7 +37,7 @@ def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
       return True
 
 @app.post("/jobs/", status_code=status.HTTP_201_CREATED)
-async def schedule_job(job: Job, authorized: bool = Depends(validate_basic_auth)):
+async def create_job(job: Job, authorized: bool = Depends(validate_basic_auth)):
   if not authorized:
     raise HTTPException(
       status_code=status.HTTP_401_UNAUTHORIZED,
@@ -41,10 +46,12 @@ async def schedule_job(job: Job, authorized: bool = Depends(validate_basic_auth)
     )
   # TODO: this is where we schedule ze job!
   # embedd the scheduling information into the Job model
+
   return job
 
 @app.get("/")
-async def root():
+def root():
+    schedule_job('fake-id')
     return { "revision": os.environ.get('REVISION') }
 
 def start_app(reload=False):

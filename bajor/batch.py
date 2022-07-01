@@ -13,16 +13,7 @@ from azure.common.credentials import ServicePrincipalCredentials
 # ContainerClient
 from azure.storage.blob import ContainerSasPermissions, generate_container_sas
 
-# Gunicorn logger handler will get attached if needed in server.py
-log = logging.getLogger(os.getenv('FLASK_APP', default='BAJOR'))
-
-# add stdout stream logging - used if we run via main()
-def setup_stdout_logging(level=logging.DEBUG):
-    logging.basicConfig(
-        level=level,
-        format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
-        stream=sys.stdout
-    )
+log = logging.getLogger('BAJOR')
 
 @cache
 def azure_batch_client():
@@ -48,7 +39,8 @@ def get_utc_time():
 def create_batch_job(job_id, manifest_container_path, pool_id):
     job_submission_timestamp = get_utc_time()
 
-    log.info('server_job, create_batch_job, using manifest from path: {}'.format(manifest_container_path))
+    log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
+        manifest_container_path))
     # TODO: add job completed / error reporting for job tracking data model (pgserver / redis / sqlite?)
     # or possibly use container storage entires or even maybe container table storage
     #   if len(image_paths) == 0:
@@ -60,7 +52,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # job_status = get_job_status('created', f'{num_images} images listed; submitting the job...')
     # job_status_table.update_job_status(job_id, job_status)
 
-    log.info(f'BatchJobManager, create_job, job_id: {job_id}')
+    log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
     job = JobAddParameter(
         id=job_id,
         pool_info=PoolInformation(pool_id=pool_id),
@@ -169,7 +161,7 @@ def create_job_tasks(job_id, task_id=1):
 
     for task_result in collection_results.value:
         if task_result.status is not TaskAddStatus.success:
-            log.info(f'task {task_result.task_id} failed to submitted. '
+            log.debug(f'task {task_result.task_id} failed to submitted. '
                      f'status: {task_result.status}, error: {task_result.error}')
 
 
@@ -186,8 +178,8 @@ def get_batch_job_list(job_list_options=JobListOptions(
     return jobs_list
 
 def list_active_jobs():
-  log.info('Active batch jobs list')
-  log.info(get_batch_job_list())
+  log.debug('Active batch jobs list')
+  log.debug(get_batch_job_list())
 
 def schedule_job(job_id):
     # Zoobot Azure Batch pool ID
@@ -197,20 +189,23 @@ def schedule_job(job_id):
     manifest_path = os.getenv(
         'MANIFEST_PATH', 'training_catalogues/workflow-3598-2022-06-24T14:18:16+00:00.csv')
 
-    # remove level or set the for more info
-    setup_stdout_logging(logging.INFO)
-
     if active_jobs_running():
-      log.warning(
+      log.debug(
           'Active Jobs are running in the batch system - please wait till they are fininshed processing.')
     else:
-      log.warning('No active jobs running - lets get scheduling!')
-      create_batch_job(
-          job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
-      create_job_tasks(job_id=job_id)
+      log.debug('No active jobs running - lets get scheduling!')
+      # create_batch_job(
+      #     job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
+      # create_job_tasks(job_id=job_id)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level = logging.DEBUG,
+        format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+        stream = sys.stdout
+    )
+
     job_id = str(uuid.uuid4())
     schedule_job(job_id)
 

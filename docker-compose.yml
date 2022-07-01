@@ -13,5 +13,6 @@ services:
       - env.list
     environment:
       - DEBUG=true
+      - LOG_LEVEL=DEBUG
     ports:
       - 8000:8000
