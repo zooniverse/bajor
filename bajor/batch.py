@@ -71,6 +71,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
         on_all_tasks_complete=OnAllTasksComplete.terminate_job
     )
     azure_batch_client().job.add(job)
+    return job_id
 
 
 def storage_container_sas_url():
@@ -159,11 +160,21 @@ def create_job_tasks(job_id, task_id=1):
     # return type: TaskAddCollectionResult
     collection_results = azure_batch_client().task.add_collection(job_id, tasks)
 
+    failed_task_submission = False
     for task_result in collection_results.value:
         if task_result.status is not TaskAddStatus.success:
             log.debug(f'task {task_result.task_id} failed to submitted. '
                      f'status: {task_result.status}, error: {task_result.error}')
+            failed_task_submission = True
 
+    if failed_task_submission:
+        return task_submission_status(state='error', message=task_result.error)
+    else:
+        return task_submission_status(state='submitted')
+
+
+def task_submission_status(state, message='Job submitted successfully'):
+    return {"task_submission_status": {"status": state, "message": message}}
 
 def active_jobs_running():
   return len(get_batch_job_list()) > 0
@@ -181,22 +192,23 @@ def list_active_jobs():
   log.debug('Active batch jobs list')
   log.debug(get_batch_job_list())
 
-def schedule_job(job_id):
+def schedule_job(job_id, manifest_path):
     # Zoobot Azure Batch pool ID
     pool_id = os.getenv('POOL_ID', 'gz_training_staging_0')
 
-    # TODO: allow this manifest path to be set via an API query / post param
-    manifest_path = os.getenv(
-        'MANIFEST_PATH', 'training_catalogues/workflow-3598-2022-06-24T14:18:16+00:00.csv')
-
     if active_jobs_running():
-      log.debug(
-          'Active Jobs are running in the batch system - please wait till they are fininshed processing.')
+      msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
+      log.debug(msg)
+      submitted_job_id = None
+      job_task_submission_status = task_submission_status(state='error', message='msg')
     else:
       log.debug('No active jobs running - lets get scheduling!')
-      # create_batch_job(
-      #     job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
-      # create_job_tasks(job_id=job_id)
+      submitted_job_id = create_batch_job(
+          job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
+      job_task_submission_status = create_job_tasks(job_id=job_id)
+
+    # return the submitted job_id and task submission status tuple
+    return { "submitted_job_id": submitted_job_id, "job_task_status": job_task_submission_status }
 
 
 if __name__ == '__main__':
@@ -207,5 +219,6 @@ if __name__ == '__main__':
     )
 
     job_id = str(uuid.uuid4())
-    schedule_job(job_id)
+    manifest_path = os.getenv('MANIFEST_PATH')
+    schedule_job(job_id, manifest_path)
 
