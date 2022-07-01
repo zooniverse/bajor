@@ -2,19 +2,21 @@ import uvicorn
 import os
 import secrets
 import uuid
-from fastapi import Depends, FastAPI, HTTPException, status
+import logging
+from fastapi import Depends, FastAPI, HTTPException, status, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
 from logging.config import dictConfig
-from bajor.batch import schedule_job
+from bajor.batch import schedule_job, active_jobs_running
 from bajor.log_config import log_config
-
 
 if os.getenv('DEBUG'):
   import pdb
 
+# setup the logger
 dictConfig(log_config)
+log = logging.getLogger('BAJOR')
 
 app = FastAPI()
 # configure HB through the env vars https://docs.honeybadger.io/lib/python/#configuration
@@ -38,23 +40,33 @@ def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     else:
       return True
 
+
+def active_batch_jobs():
+  return active_jobs_running()
+
 @app.post("/jobs/", status_code=status.HTTP_201_CREATED)
-async def create_job(job: Job, authorized: bool = Depends(validate_basic_auth)):
-  if not authorized:
-    raise HTTPException(
-      status_code=status.HTTP_401_UNAUTHORIZED,
-      detail="Incorrect username or password",
-      headers={"WWW-Authenticate": "Basic"},
-    )
-  # TODO: this is where we schedule ze job!
-  # embedd the scheduling information into the Job model
-  job_id = str(uuid.uuid4())
+async def create_job(job: Job, response: Response, authorized: bool = Depends(validate_basic_auth)) -> Job:
+    if not authorized:
+      raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect username or password",
+        headers={"WWW-Authenticate": "Basic"},
+      )
 
-  results = schedule_job(job_id, job.manifest_path)
-  job.id = results['submitted_job_id']
-  job.status = results['job_task_status']
+    job_id = str(uuid.uuid4())
 
-  return job
+    if active_batch_jobs():
+      msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
+      log.debug(msg)
+      response.status_code = status.HTTP_409_CONFLICT
+      return { "state": "error", "message": msg }
+    else:
+      log.debug('No active jobs running - lets get scheduling!')
+      results = schedule_job(job_id, job.manifest_path)
+      job.id = results['submitted_job_id']
+      job.status = results['job_task_status']
+
+      return job
 
 @app.get("/")
 def root():
