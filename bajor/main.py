@@ -51,7 +51,6 @@ async def create_job(job: Job, authorized: bool = Depends(validate_basic_auth)):
 
 @app.get("/")
 def root():
-    schedule_job('fake-id')
     return { "revision": os.environ.get('REVISION') }
 
 def start_app(reload=False):
