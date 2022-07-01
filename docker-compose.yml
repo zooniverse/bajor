@@ -14,5 +14,6 @@ services:
     environment:
       - DEBUG=true
       - LOG_LEVEL=DEBUG
+      - MANIFEST_PATH=training_catalogues/workflow-3598-2022-06-24T14:18:16+00:00.csv
     ports:
       - 8000:8000
