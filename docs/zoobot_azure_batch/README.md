@@ -68,7 +68,7 @@ Each node pool can specify different compute resources and/or different docker i
 
 Currently we only have one `training` node pool for the Zoobot ML system but in theory we can have different nodepool targets as needed. For instance, we may build a different nodepool for the `inferencing` system if the `training` nodepool doesn't meet requirements and alteratively we may have a new ML system that uses say Tensorflow, we would create a new nodepool for this system and link a new docker image that can run the tensorflow version of this new ML code.
 
-Follow the `examples/create_batch_pool.ipynb` notebook in the PR at [create_batch_pool PR](https://github.com/zooniverse/panoptes-python-notebook/pull/4) to create one. You should only need to do this for new instances of Zoobot / ML systems or to add new compute resources, e.g. new GPU type or more GPUs, CPU, RAM, etc.
+Follow the notebook in [examples/create_batch_pool_zoobot_staging.ipynb](https://github.com/zooniverse/panoptes-python-notebook/blob/16764b6eaf435917a25bebac05c43c4749132643/examples/create_batch_pool_zoobot_staging.ipynb) to create a Zoobot nodepool for the ML training / inference workload.. You should only need to do this for new instances of Zoobot / ML systems or to add new compute resources, e.g. new GPU type or more GPUs, CPU, RAM, etc.
 
 ** Azure batch is responsible for the VM provisioning etc - as long as your node pool is setup correctly the docker images will run with the CPU, RAM and GPUs etc!
 
