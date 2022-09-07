@@ -58,12 +58,29 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
         pool_info=PoolInformation(pool_id=pool_id),
         # setup the env variables for all tasks in the job
         common_environment_settings=[
+            # specify the place we have setup the code that setups our catalogs and calls zoobot correctly
+            # note: this dir contains a custom 'train_model_on_catalog.py' file copied from zoobot to our blob storage system
+            # on each batch job run this file will be copied from the blob storage location to an execution location on the batch system
+            # this setup allows us to quickly iterate on code changes on how we use zoobot withougt requiring a rebuild to the zoobot image
+            # -- can be set by the bajor system CODE_FILE_PATH env var
+            EnvironmentSetting(
+                name='CODE_FILE_PATH',
+                value=os.getenv('CODE_FILE_PATH', 'code/train_model_on_catalog.py')),
+            # specify the place we have setup the blob storage container to mount to
+            # this is linked to how we built the batch system, see the batch system setup code in
+            # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
+            EnvironmentSetting(
+                name='CONTAINER_MOUNT_DIR',
+                value='training'),
+            # set the manifest file path from the value supplied by the API
             EnvironmentSetting(
                 name='MANIFEST_PATH',
                 value=manifest_container_path),
+            # set the mission catalog file path (defaults to decals 5 at the moment)
+            # -- can be set by the bajor system MISSION_MANIFEST_PATH env var
             EnvironmentSetting(
-                name='CONTAINER_MOUNT_DIR',
-                value='training_storage')
+                name='MISSION_MANIFEST_PATH',
+                value=os.getenv('MISSION_MANIFEST_PATH', 'catalogues/decals_dr5/decals_dr5_ortho_catalog.parquet'))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
@@ -89,11 +106,18 @@ def storage_container_sas_url():
     # construct the SAS token storate account URL
     return f'https://{storage_account_name}.blob.core.windows.net/{container_name}?{container_sas_token}'
 
+
+def training_job_dir(job_id):
+    return f'jobs/job_{job_id}'
+
+
 def training_job_results_dir(job_id):
-  return f'training_jobs/job_{job_id}/results/'
+  return f'{training_job_dir(job_id)}/results/'
+
 
 def training_job_logs_path(job_id, task_id, suffix):
-  return f'training_jobs/job_{job_id}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
+  return f'{training_job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
+
 
 def create_job_tasks(job_id, task_id=1):
     # for persisting stdout and stderr log files in container storage
@@ -140,7 +164,13 @@ def create_job_tasks(job_id, task_id=1):
     # TODO: figure out how to avoid 0 byte file artifacts being created on storage conatiners
     #       from the mkdir cmd - maybe just write a file in the nested conatiner paths where it's needed?
     # TODO: ensure we pass the original decals 5 training catalog as well (staging will use a sample, production the whole shebang)
-    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} && python /usr/src/zoobot/train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} --epochs 3 --batch-size 5 --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
+#
+#
+#  how do we make sure we know the best trained model checkpoint after a training run has completed ??
+#
+#
+    results_dir = training_job_results_dir(job_id)
+    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp -f $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH /usr/src/zoobot/ && python /usr/src/zoobot/train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir}  --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
