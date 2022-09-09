@@ -65,7 +65,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # -- can be set by the bajor system CODE_FILE_PATH env var
             EnvironmentSetting(
                 name='CODE_FILE_PATH',
-                value=os.getenv('CODE_FILE_PATH', 'code/train_model_on_catalog.py')),
+                value=os.getenv('CODE_FILE_PATH', 'code/staging/train_model_on_catalog.py')),
             # specify the place we have setup the blob storage container to mount to
             # this is linked to how we built the batch system, see the batch system setup code in
             # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
