@@ -96,7 +96,7 @@ def storage_container_sas_url():
     access_duration_hrs = os.getenv('SAS_ACCESS_DURATION_HOURS', 12)
     storage_account_name = os.getenv(
         'STORAGE_ACCOUNT_NAME', 'kadeactivelearning')
-    container_name = os.getenv('STORAGE_CONTAINER', 'staging')
+    container_name = os.getenv('STORAGE_CONTAINER', 'training')
     container_sas_token = generate_container_sas(
         account_name=storage_account_name,
         container_name=container_name,
