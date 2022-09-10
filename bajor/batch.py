@@ -170,7 +170,7 @@ def create_job_tasks(job_id, task_id=1):
 #
 #
     results_dir = training_job_results_dir(job_id)
-    command = f'/bin/bash -c \"echo $AZ_BATCH_TASK_WORKING_DIR && mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH . && python /usr/src/zoobot/train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
+    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH . && pip install -U -e /usr/src/zoobot && python ./train_model_on_catalog.py --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
@@ -181,7 +181,7 @@ def create_job_tasks(job_id, task_id=1):
         command_line=command,
         container_settings=TaskContainerSettings(
             image_name=os.getenv('CONTAINER_IMAGE_NAME'),
-            container_run_options='--workdir /usr/src/zoobot'
+            working_directory='containerImageDefault'
         ),
         output_files=std_err_and_out
     )
