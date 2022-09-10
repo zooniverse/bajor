@@ -181,7 +181,7 @@ def create_job_tasks(job_id, task_id=1):
         command_line=command,
         container_settings=TaskContainerSettings(
             image_name=os.getenv('CONTAINER_IMAGE_NAME'),
-            working_directory='containerImageDefault'
+            container_run_options='--workdir /usr/src/zoobot'
         ),
         output_files=std_err_and_out
     )
