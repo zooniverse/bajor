@@ -186,7 +186,7 @@ def create_job_tasks(job_id, task_id=1, batch_size=None, debug=False):
         container_settings=TaskContainerSettings(
             image_name=os.getenv('CONTAINER_IMAGE_NAME'),
             working_directory='taskWorkingDirectory',
-            container_run_options='--shm-size=16g'
+            container_run_options='--ipc=host'
         ),
         output_files=std_err_and_out
     )
