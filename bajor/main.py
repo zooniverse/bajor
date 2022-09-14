@@ -30,7 +30,7 @@ class Job(BaseModel):
     id: str | None
     status: str | None
     batch_size: int | None
-    debug: bool | False
+    debug: bool | None
 
 def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = secrets.compare_digest(
