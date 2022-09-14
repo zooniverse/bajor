@@ -73,4 +73,4 @@ def test_batch_scheduling_code_is_called(mocked_client):
     )
     assert response.status_code == 201
     assert response.json() == {
-        'manifest_path': 'test_manifest_file_path.csv', 'id': submitted_job_id, 'status': {"status": "started", "message": "Job submitted successfully"}}
+        'manifest_path': 'test_manifest_file_path.csv', 'id': submitted_job_id, 'batch_size': None, 'debug': None, 'status': {"status": "started", "message": "Job submitted successfully"}}
