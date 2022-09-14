@@ -29,6 +29,8 @@ class Job(BaseModel):
     manifest_path: str
     id: str | None
     status: str | None
+    batch_size: int | None
+    debug: bool | False
 
 def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = secrets.compare_digest(
@@ -62,7 +64,7 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
       return { "state": "error", "message": msg }
     else:
       log.debug('No active jobs running - lets get scheduling!')
-      results = schedule_job(job_id, job.manifest_path)
+      results = schedule_job(job_id, job.manifest_path, job.batch_size, job.debug)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 

@@ -119,7 +119,7 @@ def training_job_logs_path(job_id, task_id, suffix):
   return f'{training_job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 
-def create_job_tasks(job_id, task_id=1):
+def create_job_tasks(job_id, task_id=1, batch_size=None, debug=False):
     # for persisting stdout and stderr log files in container storage
     container_sas_url = storage_container_sas_url()
     # persist stdout and stderr (will be removed when node removed)
@@ -170,7 +170,10 @@ def create_job_tasks(job_id, task_id=1):
 #
 #
     results_dir = training_job_results_dir(job_id)
-    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH . && python ./train_model_on_catalog.py --debug --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
+    debug_opt = '--debug ' if debug else ''
+    batch_size_opt = f'--batch-size {int(batch_size)}' if batch_size else ''
+    run_opts = f'{debug_opt}{batch_size_opt}'
+    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH . && python ./train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
@@ -222,13 +225,13 @@ def list_active_jobs():
   log.debug('Active batch jobs list')
   log.debug(get_batch_job_list())
 
-def schedule_job(job_id, manifest_path):
+def schedule_job(job_id, manifest_path, batch_size=None, debug=None):
     # Zoobot Azure Batch pool ID
     pool_id = os.getenv('POOL_ID', 'training_0')
 
     submitted_job_id = create_batch_job(
         job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
-    job_task_submission_status = create_job_tasks(job_id=job_id)
+    job_task_submission_status = create_job_tasks(job_id=job_id, batch_size=batch_size, debug=debug)
 
     # return the submitted job_id and task submission status dict
     return { "submitted_job_id": submitted_job_id, "job_task_status": job_task_submission_status }
