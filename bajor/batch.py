@@ -178,13 +178,15 @@ def create_job_tasks(job_id, task_id=1, batch_size=None, debug=False):
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
 
-    # create a job task to run the Zoobot training system command
+    # create a job task to run the Zoobot training system command via the zoobot docker conatiner
+    #
     task = TaskAddParameter(
         id=str(task_id),
         command_line=command,
         container_settings=TaskContainerSettings(
             image_name=os.getenv('CONTAINER_IMAGE_NAME'),
-            working_directory='taskWorkingDirectory'
+            working_directory='taskWorkingDirectory',
+            container_run_options='--shm-size="16g"'
         ),
         output_files=std_err_and_out
     )
