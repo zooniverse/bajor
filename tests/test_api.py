@@ -8,7 +8,7 @@ submitted_job_id = 'fake-job-id'
 @pytest.fixture
 def mocked_client():
   """ Setup a TestClient API application with the mocked batch.py job scheduling function """
-  with mock.patch.multiple('bajor.batch', schedule_job=mock.DEFAULT, active_jobs_running=mock.DEFAULT) as mocked_values:
+  with mock.patch.multiple('bajor.training.batch', schedule_job=mock.DEFAULT, active_jobs_running=mock.DEFAULT) as mocked_values:
 
     result_set = {"submitted_job_id": submitted_job_id,
                   "job_task_status": {"status": "started", "message": "Job submitted successfully"}}
@@ -17,14 +17,14 @@ def mocked_client():
     mocked_values['active_jobs_running'].return_value = False
 
     # ensure we import this code after patching the batch#schedule_job function
-    from bajor.main import app
+    from bajor.api import app
     client = TestClient(app)
 
     yield client
 
 
 @mock.patch.dict(os.environ, {"REVISION": fake_revision})
-def test_read_main(mocked_client):
+def test_read_api(mocked_client):
     response = mocked_client.get("/")
     assert response.status_code == 200
     assert response.json() == {"revision": fake_revision}

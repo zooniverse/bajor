@@ -87,6 +87,14 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
         # This is so that we do not take up the quota for active Jobs in the Batch account.
         on_all_tasks_complete=OnAllTasksComplete.terminate_job
     )
+    # add the data preparation task to the job
+    job.job_preparation_task = JobPreparationTask(
+        command_line=common.helpers.wrap_commands_in_shell(
+            'linux', ['echo job preparation task!']))
+    # add a callback to bajor to notify the job completed
+    job.job_release_task = JobReleaseTask(
+        command_line=common.helpers.wrap_commands_in_shell(
+            'linux', ['echo job release task!']))
     azure_batch_client().job.add(job)
     return job_id
 

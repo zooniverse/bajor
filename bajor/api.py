@@ -8,7 +8,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
 from logging.config import dictConfig
-from bajor.batch import schedule_job, active_jobs_running
+from bajor.training.batch import schedule_job, active_jobs_running
 from bajor.log_config import log_config
 
 if os.getenv('DEBUG'):
@@ -75,7 +75,7 @@ def root():
 
 def start_app(reload=False):
     uvicorn.run(
-        "bajor.main:app",
+        "bajor.api:app",
         host=os.environ.get('HOST', '0.0.0.0'),
         port=int(os.environ.get('PORT', '8000')),
         reload=reload

@@ -16,8 +16,8 @@ honeybadger = "^0.8.0"
 pytest = "^7.1.2"
 
 [tool.poetry.scripts]
-start = "bajor.main:start_app"
-dev = "bajor.main:start_dev_app"
+start = "bajor.api:start_app"
+dev = "bajor.api:start_dev_app"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
