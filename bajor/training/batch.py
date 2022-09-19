@@ -7,10 +7,11 @@ if os.getenv('DEBUG'):
 from functools import cache
 from datetime import datetime, timezone, timedelta
 
+from bajor.env_helpers import api_basic_username, api_basic_password, api_job_complete_url
+
+import azure.batch.models as batchmodels
 from azure.batch import BatchServiceClient
-from azure.batch.models import *
 from azure.common.credentials import ServicePrincipalCredentials
-# ContainerClient
 from azure.storage.blob import ContainerSasPermissions, generate_container_sas
 
 log = logging.getLogger('BAJOR')
@@ -53,9 +54,9 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # job_status_table.update_job_status(job_id, job_status)
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
-    job = JobAddParameter(
+    job = batchmodels.JobAddParameter(
         id=job_id,
-        pool_info=PoolInformation(pool_id=pool_id),
+        pool_info=batchmodels.PoolInformation(pool_id=pool_id),
         # setup the env variables for all tasks in the job
         common_environment_settings=[
             # specify the place we have setup the code that setups our catalogs and calls zoobot correctly
@@ -63,38 +64,62 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # on each batch job run this file will be copied from the blob storage location to an execution location on the batch system
             # this setup allows us to quickly iterate on code changes on how we use zoobot withougt requiring a rebuild to the zoobot image
             # -- can be set by the bajor system CODE_FILE_PATH env var
-            EnvironmentSetting(
+            batchmodels.EnvironmentSetting(
                 name='CODE_FILE_PATH',
                 value=os.getenv('CODE_FILE_PATH', 'code/staging/train_model_on_catalog.py')),
             # specify the place we have setup the blob storage container to mount to
             # this is linked to how we built the batch system, see the batch system setup code in
             # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
-            EnvironmentSetting(
+            batchmodels.EnvironmentSetting(
                 name='CONTAINER_MOUNT_DIR',
                 value='training'),
             # set the manifest file path from the value supplied by the API
-            EnvironmentSetting(
+            batchmodels.EnvironmentSetting(
                 name='MANIFEST_PATH',
                 value=manifest_container_path),
             # set the mission catalog file path (defaults to decals 5 at the moment)
             # -- can be set by the bajor system MISSION_MANIFEST_PATH env var
-            EnvironmentSetting(
+            batchmodels.EnvironmentSetting(
                 name='MISSION_MANIFEST_PATH',
                 value=os.getenv('MISSION_MANIFEST_PATH', 'catalogues/decals_dr5/decals_dr5_ortho_catalog.parquet'))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
         # This is so that we do not take up the quota for active Jobs in the Batch account.
-        on_all_tasks_complete=OnAllTasksComplete.terminate_job
+        on_all_tasks_complete=batchmodels.OnAllTasksComplete.terminate_job
     )
-    # add the data preparation task to the job
-    job.job_preparation_task = JobPreparationTask(
-        command_line=common.helpers.wrap_commands_in_shell(
-            'linux', ['echo job preparation task!']))
-    # add a callback to bajor to notify the job completed
-    job.job_release_task = JobReleaseTask(
-        command_line=common.helpers.wrap_commands_in_shell(
-            'linux', ['echo job release task!']))
+
+    # Batch Job lifecycle hooks setup
+    # https://github.com/Azure-Samples/azure-batch-samples/blob/079a7d24b129bdd21a12efe81bdd54f0c1211aa3/Python/Batch/sample1_jobprep_and_release.py#L76-L86
+    #
+    # job preparation task can be used to download data / files used in the jobs tasks etc
+    # for prediction workloads this can be used to pull the data down
+    # from remote URLs to a local file system to be fed through the ML model
+    #
+    # # add the data preparation task to the job
+    # job.job_preparation_task = batchmodels.JobPreparationTask(
+    #     command_line=f'/bin/bash -c \"set -e; CMD_TO_DO_JOB_PREPARATION"')
+
+    # add a callback to bajor to notify the job completed via a
+    # Job release task that runs after the job completes
+    #
+    # TODO: use this to run the post training hooks
+    #   e.g. 1.promote trained mode for use in prediction system
+    #
+    # longer term can be the hook system for a training run where
+    # we promote best the zoobot model to a shared blob storage location
+    # and do the job lifecycle management webhook to bajor
+    # job.job_release_task = batchmodels.JobReleaseTask(
+    #     command_line=f'/bin/bash -c \"set -e;  TODO_CMD_TO_FIND_ZOOBOT_MODEL_AND_PROMOTE_TO_SHARED_STORAGE"')
+
+    # use the job manager task to do something with the job information
+    # and submit say job tasks to run, i.e. interpret a file and create a set of tasks from that file (think camera traps task batching)
+    # job_manager_task = batchmodels.JobManagerTask(
+    #     id="JobManagerTask",
+    #     command_line=f'/bin/bash -c \"set -e; CMD_TO_DO_JOB_MANAGEMENT"',
+    #     resource_files=[batchmodels.ResourceFile(
+    #         file_path=_SIMPLE_TASK_NAME,
+    #         http_url=sas_url)]))
     azure_batch_client().job.add(job)
     return job_id
 
@@ -132,33 +157,33 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     container_sas_url = storage_container_sas_url()
     # persist stdout and stderr (will be removed when node removed)
     # paths are relative to the Task working directory
-    stderr_destination = OutputFileDestination(
-        container=OutputFileBlobContainerDestination(
+    stderr_destination = batchmodels.OutputFileDestination(
+        container=batchmodels.OutputFileBlobContainerDestination(
             container_url=container_sas_url,
             path=training_job_logs_path(
               job_id=job_id, task_id=task_id, suffix='stderr')
         )
     )
-    stdout_destination = OutputFileDestination(
-        container=OutputFileBlobContainerDestination(
+    stdout_destination = batchmodels.OutputFileDestination(
+        container=batchmodels.OutputFileBlobContainerDestination(
             container_url=container_sas_url,
             path=training_job_logs_path(
                 job_id=job_id, task_id=task_id, suffix='stdout')
         )
     )
     std_err_and_out = [
-        OutputFile(
+        batchmodels.OutputFile(
             file_pattern='../stderr.txt',  # stderr.txt is at the same level as wd
             destination=stderr_destination,
-            upload_options=OutputFileUploadOptions(
-                upload_condition=OutputFileUploadCondition.task_completion)
+            upload_options=batchmodels.OutputFileUploadOptions(
+                upload_condition=batchmodels.OutputFileUploadCondition.task_completion)
             # can also just upload on failure
         ),
-        OutputFile(
+        batchmodels.OutputFile(
             file_pattern='../stdout.txt',
             destination=stdout_destination,
-            upload_options=OutputFileUploadOptions(
-                upload_condition=OutputFileUploadCondition.task_completion)
+            upload_options=batchmodels.OutputFileUploadOptions(
+                upload_condition=batchmodels.OutputFileUploadCondition.task_completion)
         )
     ]
 
@@ -169,14 +194,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # OR
     # TODO: add links to the Batch Scheduling system setup
     #       container for zoobot built in etc to show how this works
-    # TODO: figure out how to avoid 0 byte file artifacts being created on storage conatiners
-    #       from the mkdir cmd - maybe just write a file in the nested conatiner paths where it's needed?
-    # TODO: ensure we pass the original decals 5 training catalog as well (staging will use a sample, production the whole shebang)
-#
-#
-#  how do we make sure we know the best trained model checkpoint after a training run has completed ??
-#
-#
+    #
     results_dir = training_job_results_dir(job_id)
     command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH . && python ./train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
@@ -185,10 +203,10 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
 
     # create a job task to run the Zoobot training system command via the zoobot docker conatiner
     #
-    task = TaskAddParameter(
+    task = batchmodels.TaskAddParameter(
         id=str(task_id),
         command_line=command,
-        container_settings=TaskContainerSettings(
+        container_settings=batchmodels.TaskContainerSettings(
             image_name=os.getenv('CONTAINER_IMAGE_NAME'),
             working_directory='taskWorkingDirectory',
             container_run_options='--ipc=host'
@@ -202,7 +220,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
 
     failed_task_submission = False
     for task_result in collection_results.value:
-        if task_result.status is not TaskAddStatus.success:
+        if task_result.status is not batchmodels.TaskAddStatus.success:
             log.debug(f'task {task_result.task_id} failed to submitted. '
                      f'status: {task_result.status}, error: {task_result.error}')
             failed_task_submission = True
@@ -219,7 +237,7 @@ def task_submission_status(state, message='Job submitted successfully'):
 def active_jobs_running():
   return len(get_batch_job_list()) > 0
 
-def get_batch_job_list(job_list_options=JobListOptions(
+def get_batch_job_list(job_list_options=batchmodels.JobListOptions(
     filter='state eq \'active\'',
     select='id'
 )):
@@ -231,6 +249,22 @@ def get_batch_job_list(job_list_options=JobListOptions(
 def list_active_jobs():
   log.debug('Active batch jobs list')
   log.debug(get_batch_job_list())
+
+def get_batch_job_status(job_id):
+    # use the raw response object vs digging into the CloudJob resource for summary data
+    # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get
+    job_status = azure_batch_client().job.get(job_id, raw=True)
+    job_status.response.json()
+
+    # longer term we can look at the job task lists as well
+    # tasks = azure_batch_client().task.list(job_id)
+    # task_list = [t for t in tasks]
+
+# get a summary of what the batch service is up to
+# https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get-all-lifetime-statistics
+def get_all_batch_job_stats():
+    job_stats = azure_batch_client().job.get_all_lifetime_statistics
+    job_stats.response.json()
 
 def schedule_job(job_id, manifest_path, run_opts=''):
     # Zoobot Azure Batch pool ID
@@ -251,7 +285,9 @@ if __name__ == '__main__':
         stream = sys.stdout
     )
 
-    job_id = str(uuid.uuid4())
-    manifest_path = os.getenv('MANIFEST_PATH')
-    schedule_job(job_id, manifest_path)
+    pdb.set_trace()
+
+    # job_id = str(uuid.uuid4())
+    # manifest_path = os.getenv('MANIFEST_PATH')
+    # schedule_job(job_id, manifest_path)
 

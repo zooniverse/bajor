@@ -8,7 +8,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
 from logging.config import dictConfig
-from bajor.training.batch import schedule_job, active_jobs_running
+from bajor.training.batch import schedule_job, active_jobs_running, get_batch_job_status
+from bajor.env_helpers import api_basic_username, api_basic_password, revision, host, port
 from bajor.log_config import log_config
 
 if os.getenv('DEBUG'):
@@ -33,9 +34,9 @@ class Job(BaseModel):
 
 def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = secrets.compare_digest(
-        credentials.username, os.environ.get('BASIC_AUTH_USERNAME', 'bajor'))
+        credentials.username, api_basic_username())
     correct_password = secrets.compare_digest(
-        credentials.password, os.environ.get('BASIC_AUTH_PASSWORD', 'bajor'))
+        credentials.password, api_basic_password())
     if not (correct_username and correct_password):
         return False
     else:
@@ -69,15 +70,29 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
 
       return job
 
+
+@app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
+async def create_job(job_id: str, response: Response, authorized: bool = Depends(validate_basic_auth)) -> Job:
+    if not authorized:
+      raise HTTPException(
+          status_code=status.HTTP_401_UNAUTHORIZED,
+          detail="Incorrect username or password",
+          headers={"WWW-Authenticate": "Basic"},
+      )
+
+    log.debug(f'Job status for id: {job_id}')
+    return get_batch_job_status(job_id)
+
+
 @app.get("/")
 def root():
-    return { "revision": os.environ.get('REVISION') }
+    return {"revision": revision()}
 
 def start_app(reload=False):
     uvicorn.run(
         "bajor.api:app",
-        host=os.environ.get('HOST', '0.0.0.0'),
-        port=int(os.environ.get('PORT', '8000')),
+        host=host(),
+        port=int(port()),
         reload=reload
     )
 
