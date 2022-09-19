@@ -30,15 +30,8 @@ def azure_batch_client():
                             'https://zoobot.eastus.batch.azure.com')
     )
 
-def get_utc_time():
-    # return current UTC time as a string in the ISO 8601 format (so we can query by
-    # timestamp in the Cosmos DB job status table.
-    # example: '2021-02-08T20:02:05.699689Z'
-    return datetime.now(timezone.utc).isoformat(timespec='microseconds') + 'Z'
-
-
 def create_batch_job(job_id, manifest_container_path, pool_id):
-    job_submission_timestamp = get_utc_time()
+
 
     log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
         manifest_container_path))
@@ -97,6 +90,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # from remote URLs to a local file system to be fed through the ML model
     #
     # # add the data preparation task to the job
+    # TODO: creat the directories that the command will rely on (results and job id dir)
+    # touch a file in each path as it's blob storage
     # job.job_preparation_task = batchmodels.JobPreparationTask(
     #     command_line=f'/bin/bash -c \"set -e; CMD_TO_DO_JOB_PREPARATION"')
 
@@ -141,7 +136,9 @@ def storage_container_sas_url():
 
 
 def training_job_dir(job_id):
-    return f'jobs/job_{job_id}'
+    # append a timestamp to the job blob storage dir to help us navigate the job history timeline
+    job_submission_timestamp = datetime.now().isoformat(timespec='minutes')
+    return f'jobs/{job_submission_timestamp}_{job_id}'
 
 
 def training_job_results_dir(job_id):
