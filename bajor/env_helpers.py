@@ -11,10 +11,10 @@ def api_job_complete_url(job_id):
     return f'{bajor_url}/job/{job_id}'
 
 def revision():
-    os.environ.get('REVISION')
+    return os.environ.get('REVISION')
 
 def host():
-    os.environ.get('HOST', '0.0.0.0')
+    return os.environ.get('HOST', '0.0.0.0')
 
 def port():
-    os.environ.get('PORT', '8000')
+    return os.environ.get('PORT', '8000')
