@@ -285,8 +285,7 @@ if __name__ == '__main__':
         stream = sys.stdout
     )
 
-    pdb.set_trace()
-
+    # pdb.set_trace()
     # job_id = str(uuid.uuid4())
     # manifest_path = os.getenv('MANIFEST_PATH')
     # schedule_job(job_id, manifest_path)
