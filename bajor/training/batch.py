@@ -254,7 +254,7 @@ def get_batch_job_status(job_id):
     # use the raw response object vs digging into the CloudJob resource for summary data
     # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get
     job_status = azure_batch_client().job.get(job_id, raw=True)
-    job_status.response.json()
+    return job_status.response.json()
 
     # longer term we can look at the job task lists as well
     # tasks = azure_batch_client().task.list(job_id)
@@ -264,7 +264,7 @@ def get_batch_job_status(job_id):
 # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get-all-lifetime-statistics
 def get_all_batch_job_stats():
     job_stats = azure_batch_client().job.get_all_lifetime_statistics
-    job_stats.response.json()
+    return job_stats.response.json()
 
 def schedule_job(job_id, manifest_path, run_opts=''):
     # Zoobot Azure Batch pool ID
