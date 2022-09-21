@@ -92,7 +92,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # job preparation task to create the arteface output directories
     # and copy the training code from blob storage to a runnable location
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -e; touch $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"')
+        command_line=f'/bin/bash -c \"set -e; echo "" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"')
 
     # add a callback to bajor to notify the job completed via a
     # Job release task that runs after the job completes
