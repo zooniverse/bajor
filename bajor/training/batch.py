@@ -94,7 +94,12 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # 2. copy the training code from blob storage to a shared job directory
     # see https://learn.microsoft.com/en-us/azure/batch/files-and-directories#root-directory-structure
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -e; echo "" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"')
+        command_line=f'/bin/bash -c \"set -ex; echo "" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"',
+        # avoid waiting for this prep task to complete before starting the main task
+        # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.JobPreparationTask?view=azure-python#constructor
+        # https://learn.microsoft.com/en-us/azure/batch/batch-job-task-error-checking#job-preparation-tasks
+        wait_for_success=False)
+
 
     # add a callback to bajor to notify the job completed via a
     # Job release task that runs after the job completes
