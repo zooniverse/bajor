@@ -94,7 +94,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # 2. copy the training code from blob storage to a shared job directory
     # see https://learn.microsoft.com/en-us/azure/batch/files-and-directories#root-directory-structure
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -ex; echo "" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"',
+        command_line=f'/bin/bash -c \"set -ex; mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"',
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
