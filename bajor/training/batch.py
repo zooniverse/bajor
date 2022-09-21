@@ -89,11 +89,10 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # for prediction workloads this can be used to pull the data down
     # from remote URLs to a local file system to be fed through the ML model
     #
-    # # add the data preparation task to the job
-    # TODO: creat the directories that the command will rely on (results and job id dir)
-    # touch a file in each path as it's blob storage
-    # job.job_preparation_task = batchmodels.JobPreparationTask(
-    #     command_line=f'/bin/bash -c \"set -e; CMD_TO_DO_JOB_PREPARATION"')
+    # job preparation task to create the arteface output directories
+    # and copy the training code from blob storage to a runnable location
+    job.job_preparation_task = batchmodels.JobPreparationTask(
+        command_line=f'/bin/bash -c \"set -e; touch $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"')
 
     # add a callback to bajor to notify the job completed via a
     # Job release task that runs after the job completes
@@ -104,8 +103,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # longer term can be the hook system for a training run where
     # we promote best the zoobot model to a shared blob storage location
     # and do the job lifecycle management webhook to bajor
-    # job.job_release_task = batchmodels.JobReleaseTask(
-    #     command_line=f'/bin/bash -c \"set -e;  TODO_CMD_TO_FIND_ZOOBOT_MODEL_AND_PROMOTE_TO_SHARED_STORAGE"')
+    job.job_release_task = batchmodels.JobReleaseTask(
+        command_line=f'/bin/bash -c \"set -e;  echo "Job {job_id} has completed" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/job_release_task_output.txt\"')
 
     # use the job manager task to do something with the job information
     # and submit say job tasks to run, i.e. interpret a file and create a set of tasks from that file (think camera traps task batching)
@@ -192,8 +191,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # TODO: add links to the Batch Scheduling system setup
     #       container for zoobot built in etc to show how this works
     #
-    results_dir = training_job_results_dir(job_id)
-    command = f'/bin/bash -c \"mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH . && python ./train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{results_dir} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
+    command = f'/bin/bash -c \"python $AZ_BATCH_NODE_SHARED_DIR/train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
