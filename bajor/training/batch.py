@@ -141,7 +141,7 @@ def training_job_dir(job_id):
 
 
 def training_job_results_dir(job_id):
-  return f'{training_job_dir(job_id)}/results/'
+  return f'{training_job_dir(job_id)}/results'
 
 
 def training_job_logs_path(job_id, task_id, suffix):
@@ -191,7 +191,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # TODO: add links to the Batch Scheduling system setup
     #       container for zoobot built in etc to show how this works
     #
-    command = f'/bin/bash -c \"python $AZ_BATCH_NODE_SHARED_DIR/train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)} --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
+    command = f'/bin/bash -c \"python $AZ_BATCH_NODE_SHARED_DIR/train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
