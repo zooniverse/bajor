@@ -95,7 +95,15 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # see https://learn.microsoft.com/en-us/azure/batch/files-and-directories#root-directory-structure
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; echo "" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/.keep && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"',
-        # avoid waiting for this prep task to complete before starting the main task
+        #
+        # A busted preparation task means the main task won't launch...ever!
+        # and leave the node in a scaled state costing $$ ££
+        #
+        # Long term: perhaps add a background worker to check the
+        # preparation task status and if it has failed then terminate the main job to avoid
+        # leaving the node pool in the scaled state...
+        #
+        # Short term: avoid waiting for this prep task to complete before starting the main task
         # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.JobPreparationTask?view=azure-python#constructor
         # https://learn.microsoft.com/en-us/azure/batch/batch-job-task-error-checking#job-preparation-tasks
         wait_for_success=False)
