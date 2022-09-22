@@ -80,6 +80,7 @@ async def list_jobs(response: Response, authorized: bool = Depends(validate_basi
           headers={"WWW-Authenticate": "Basic"},
       )
 
+    log.debug('Fetching job list from batch service')
     return get_batch_job_list()
 
 @app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
