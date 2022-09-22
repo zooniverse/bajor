@@ -8,7 +8,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
 from logging.config import dictConfig
-from bajor.training.batch import schedule_job, active_jobs_running, get_batch_job_status
+from bajor.training.batch import schedule_job, active_jobs_running, get_batch_job_status, get_batch_job_list
 from bajor.env_helpers import api_basic_username, api_basic_password, revision, host, port
 from bajor.log_config import log_config
 
@@ -71,8 +71,19 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
       return job
 
 
+@app.get("/jobs/", status_code=status.HTTP_200_OK)
+async def list_jobs(response: Response, authorized: bool = Depends(validate_basic_auth)):
+    if not authorized:
+      raise HTTPException(
+          status_code=status.HTTP_401_UNAUTHORIZED,
+          detail="Incorrect username or password",
+          headers={"WWW-Authenticate": "Basic"},
+      )
+
+    return get_batch_job_list()
+
 @app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
-async def create_job(job_id: str, response: Response, authorized: bool = Depends(validate_basic_auth)) -> Job:
+async def get_job_by_id(job_id: str, response: Response, authorized: bool = Depends(validate_basic_auth)):
     if not authorized:
       raise HTTPException(
           status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,7 +93,6 @@ async def create_job(job_id: str, response: Response, authorized: bool = Depends
 
     log.debug(f'Job status for id: {job_id}')
     return get_batch_job_status(job_id)
-
 
 @app.get("/")
 def root():

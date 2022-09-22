@@ -270,10 +270,6 @@ def get_batch_job_list(job_list_options=batchmodels.JobListOptions(
     jobs_list = [j for j in jobs_generator]
     return jobs_list
 
-def list_active_jobs():
-  log.debug('Active batch jobs list')
-  log.debug(get_batch_job_list())
-
 def get_batch_job_status(job_id):
     # use the raw response object vs digging into the CloudJob resource for summary data
     # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get
