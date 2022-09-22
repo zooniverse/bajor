@@ -94,12 +94,14 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # for prediction workloads this can be used to pull the data down
     # from remote URLs to a local file system to be fed through the ML model
     #
-    # job preparation task to
+    # job preparation task
+    # NOTE: job preparation tasks are hard to debug as you can't easily extract the logs :(
+    #
     # 1. create the job checkpoint results output directory on blob storage using a 0 byte file (mkdir -p makes this)
     # 2. copy the training code from blob storage to a shared job directory
     # see https://learn.microsoft.com/en-us/azure/batch/files-and-directories#root-directory-structure
     #
-    # NOTE: azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
+    # NOTE: possible improvement - azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
     # this could be used for a task to copy the code from the default storage account to the job directory
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
@@ -120,17 +122,13 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
         wait_for_success=False)
 
 
-    # add a callback to bajor to notify the job completed via a
     # Job release task that runs after the job completes
-    #
-    # TODO: use this to run the post training hooks
-    #   e.g. 1.promote trained mode for use in prediction system
-    #
-    # longer term can be the hook system for a training run where
-    # we promote best the zoobot model to a shared blob storage location
-    # and do the job lifecycle management webhook to bajor
-    # job.job_release_task = batchmodels.JobReleaseTask(
-    #     command_line=f'/bin/bash -c \"set -ex; echo Job {job_id} has completed > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/job_release_task_output.txt\"')
+    # NOTE: job release tasks are hard to debug as you can't easily extract the logs :(
+    #       like you can for the main task runs. Moving this code to the main task for now for logging purposes
+    # promote trained model to a blob storage location for use in prediction system
+    # promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
+    # promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
+    # job.job_release_task = batchmodels.JobReleaseTask(command_line=f'/bin/bash -c \"set -ex; {promote_checkpoint_cmd}\"'
 
     # use the job manager task to do something with the job information
     # and submit say job tasks to run, i.e. interpret a file and create a set of tasks from that file (think camera traps task batching)
@@ -222,7 +220,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     train_code_path = os.getenv('ZOOBOT_TRAIN_CMD', 'staging/train_model_on_catalog.py')
     train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
-    promote_checkpoint_cmd = f'AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
+    promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
     command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
