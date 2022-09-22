@@ -119,7 +119,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # we promote best the zoobot model to a shared blob storage location
     # and do the job lifecycle management webhook to bajor
     job.job_release_task = batchmodels.JobReleaseTask(
-        command_line=f'/bin/bash -c \"set -ex; echo \"Job {job_id} has completed\" > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/job_release_task_output.txt\"')
+        command_line=f'/bin/bash -c \"set -ex; echo Job {job_id} has completed > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/job_release_task_output.txt\"')
 
     # use the job manager task to do something with the job information
     # and submit say job tasks to run, i.e. interpret a file and create a set of tasks from that file (think camera traps task batching)
