@@ -53,13 +53,14 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
         # setup the env variables for all tasks in the job
         common_environment_settings=[
             # specify the place we have setup the code that setups our catalogs and calls zoobot correctly
-            # note: this dir contains a custom 'train_model_on_catalog.py' file copied from zoobot to our blob storage system
-            # on each batch job run this file will be copied from the blob storage location to an execution location on the batch system
-            # this setup allows us to quickly iterate on code changes on how we use zoobot withougt requiring a rebuild to the zoobot image
-            # -- can be set by the bajor system CODE_FILE_PATH env var
+            # note: this dir contains files that are copied from the blob storage for use in the runtime container
+            # e.g. 'train_model_on_catalog.py' file copied from zoobot to our blob storage system for running the zoobot training
+            #      'promote_best_checkpoint_to_model.sh' find the best checkpoint and promote it to the model dir for use in downstream systems
+            # this setup allows us to quickly iterate on code changes without requiring a rebuild to the zoobot container image to add changes
+            # -- all be set by the bajor system env vars
             batchmodels.EnvironmentSetting(
-                name='CODE_FILE_PATH',
-                value=os.getenv('CODE_FILE_PATH', 'code/staging/train_model_on_catalog.py')),
+                name='CODE_DIR_PATH',
+                value=os.getenv('CODE_DIR_PATH', 'code')),
             # specify the place we have setup the blob storage container to mount to
             # this is linked to how we built the batch system, see the batch system setup code in
             # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
@@ -74,7 +75,11 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # -- can be set by the bajor system MISSION_MANIFEST_PATH env var
             batchmodels.EnvironmentSetting(
                 name='MISSION_MANIFEST_PATH',
-                value=os.getenv('MISSION_MANIFEST_PATH', 'catalogues/decals_dr5/decals_dr5_ortho_catalog.parquet'))
+                value=os.getenv('MISSION_MANIFEST_PATH', 'catalogues/decals_dr5/decals_dr5_ortho_catalog.parquet')),
+            # set the training results dir path
+            batchmodels.EnvironmentSetting(
+                name='TRAINING_JOB_RESULTS_DIR',
+                value=training_job_results_dir(job_id))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
@@ -93,8 +98,14 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # 1. create the job checkpoint results output directory on blob storage using a 0 byte file (mkdir -p makes this)
     # 2. copy the training code from blob storage to a shared job directory
     # see https://learn.microsoft.com/en-us/azure/batch/files-and-directories#root-directory-structure
+    #
+    # NOTE: azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
+    # this could be used for a task to copy the code from the default storage account to the job directory
+    # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
+    create_results_dir = 'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOBS_RESULTS_DIR/checkpoints'
+    copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_DIR/* $AZ_BATCH_NODE_SHARED_DIR/'
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -ex; mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/checkpoints && cp $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_FILE_PATH $AZ_BATCH_NODE_SHARED_DIR/"',
+        command_line=f'/bin/bash -c \"set -ex; ${create_results_dir}; {copy_code_to_shared_dir}\"',
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
@@ -118,8 +129,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # longer term can be the hook system for a training run where
     # we promote best the zoobot model to a shared blob storage location
     # and do the job lifecycle management webhook to bajor
-    job.job_release_task = batchmodels.JobReleaseTask(
-        command_line=f'/bin/bash -c \"set -ex; echo Job {job_id} has completed > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/job_release_task_output.txt\"')
+    # job.job_release_task = batchmodels.JobReleaseTask(
+    #     command_line=f'/bin/bash -c \"set -ex; echo Job {job_id} has completed > $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/job_release_task_output.txt\"')
 
     # use the job manager task to do something with the job information
     # and submit say job tasks to run, i.e. interpret a file and create a set of tasks from that file (think camera traps task batching)
@@ -149,10 +160,13 @@ def storage_container_sas_url():
     return f'https://{storage_account_name}.blob.core.windows.net/{container_name}?{container_sas_token}'
 
 
+def job_submission_prefix(job_id):
+    job_submission_timestamp = datetime.now().isoformat(timespec='minutes')
+    return f'{job_submission_timestamp}_{job_id}'
+
 def training_job_dir(job_id):
     # append a timestamp to the job blob storage dir to help us navigate the job history timeline
-    job_submission_timestamp = datetime.now().isoformat(timespec='minutes')
-    return f'jobs/{job_submission_timestamp}_{job_id}'
+    return f'jobs/{job_submission_prefix(job_id)}'
 
 
 def training_job_results_dir(job_id):
@@ -200,13 +214,16 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
 
     tasks = []
     # ZOOBOT command for catalogue based training!
-    # Note: Zoobot was baked into the conatiner the Azure batch VM
-    # via the batch nodepool - see notes on panoptes-python-notebook
-    # OR
     # TODO: add links to the Batch Scheduling system setup
     #       container for zoobot built in etc to show how this works
-    #
-    command = f'/bin/bash -c \"set -ex; python $AZ_BATCH_NODE_SHARED_DIR/train_model_on_catalog.py {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/{training_job_results_dir(job_id)}/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH\" '
+    # train_cmd file path is copied from blob storage into this runtime container
+    # so this location is relative to the container paths and can be modified at runtime
+    # see jobPreparation task for code setup
+    train_code_path = os.getenv('ZOOBOT_TRAIN_CMD', 'staging/train_model_on_catalog.py')
+    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
+    promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
+    promote_checkpoint_cmd = f'AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR {job_submission_prefix(job_id)}'
+    command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
