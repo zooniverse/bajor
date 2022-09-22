@@ -31,8 +31,6 @@ def azure_batch_client():
     )
 
 def create_batch_job(job_id, manifest_container_path, pool_id):
-
-
     log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
         manifest_container_path))
     # TODO: add job completed / error reporting for job tracking data model (pgserver / redis / sqlite?)
@@ -220,7 +218,8 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     train_code_path = os.getenv('ZOOBOT_TRAIN_CMD', 'staging/train_model_on_catalog.py')
     train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
-    promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
+    # redirect the stdout to stderr for logging
+    promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
     command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
