@@ -259,12 +259,20 @@ def task_submission_status(state, message='Job submitted successfully'):
     return {"status": state, "message": message}
 
 def active_jobs_running():
-  return len(get_batch_job_list()) > 0
+    active_jobs = batchmodels.JobListOptions(
+      filter='state eq \'active\'',
+      select='id'
+    )
+    num_active_jobs = len(get_batch_job_list(active_jobs))
+    return num_active_jobs > 0
 
-def get_batch_job_list(job_list_options=batchmodels.JobListOptions(
-    filter='state eq \'active\'',
-    select='id'
-)):
+def get_non_active_batch_job_list():
+    return get_batch_job_list(batchmodels.JobListOptions(filter='state ne \'active\''))
+
+def get_active_batch_job_list():
+    return get_batch_job_list(batchmodels.JobListOptions(filter='state eq \'active\''))
+
+def get_batch_job_list(job_list_options):
     jobs_generator = azure_batch_client().job.list(
         job_list_options=job_list_options)
     jobs_list = [j for j in jobs_generator]
