@@ -218,14 +218,12 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     #       container for zoobot built in etc to show how this works
     # train_cmd file path is copied from blob storage into this runtime container
     # so this location is relative to the container paths and can be modified at runtime
-    create_results_dir = 'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
-    copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     # see jobPreparation task for code setup
     train_code_path = os.getenv('ZOOBOT_TRAIN_CMD', 'staging/train_model_on_catalog.py')
     train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
     promote_checkpoint_cmd = f'AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
-    command = f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}; python {train_cmd}; {promote_checkpoint_cmd}\"'
+    command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
