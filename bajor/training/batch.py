@@ -102,7 +102,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # NOTE: azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
     # this could be used for a task to copy the code from the default storage account to the job directory
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
-    create_results_dir = 'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOBS_RESULTS_DIR/checkpoints'
+    create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_DIR/* $AZ_BATCH_NODE_SHARED_DIR/'
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}\"',
@@ -218,7 +218,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     #       container for zoobot built in etc to show how this works
     # train_cmd file path is copied from blob storage into this runtime container
     # so this location is relative to the container paths and can be modified at runtime
-    create_results_dir = 'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOBS_RESULTS_DIR/checkpoints'
+    create_results_dir = 'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_DIR/* $AZ_BATCH_NODE_SHARED_DIR/'
     # see jobPreparation task for code setup
     train_code_path = os.getenv('ZOOBOT_TRAIN_CMD', 'staging/train_model_on_catalog.py')
