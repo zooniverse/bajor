@@ -8,7 +8,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
 from logging.config import dictConfig
-from bajor.training.batch import schedule_job, active_jobs_running, get_batch_job_status, get_active_batch_job_list, get_non_active_batch_job_list
+from bajor.batch.training import schedule_job, active_jobs_running, get_batch_job_status, get_active_batch_job_list, get_non_active_batch_job_list
 from bajor.env_helpers import api_basic_username, api_basic_password, revision, host, port
 from bajor.log_config import log_config
 

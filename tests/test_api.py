@@ -8,7 +8,7 @@ submitted_job_id = 'fake-job-id'
 @pytest.fixture
 def mocked_client():
   """ Setup a TestClient API application with the mocked batch.py job scheduling function """
-  with mock.patch.multiple('bajor.training.batch', schedule_job=mock.DEFAULT, active_jobs_running=mock.DEFAULT) as mocked_values:
+  with mock.patch.multiple('bajor.batch.training', schedule_job=mock.DEFAULT, active_jobs_running=mock.DEFAULT) as mocked_values:
 
     result_set = {"submitted_job_id": submitted_job_id,
                   "job_task_status": {"status": "started", "message": "Job submitted successfully"}}
