@@ -108,9 +108,8 @@ if __name__ == '__main__':
 
     train_with_pytorch_lightning.train_default_zoobot_from_scratch(
         save_dir=args.save_dir,
-        catalog=catalog,
         schema=schema,
-        model_architecture=args.model_architecture,
+        catalog=catalog,
         batch_size=args.batch_size,
         epochs=args.epochs,
         patience=args.patience,
