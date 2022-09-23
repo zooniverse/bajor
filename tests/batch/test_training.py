@@ -14,7 +14,7 @@ def test_active_jobs_running(mock_get_batch_job_list):
 @mock.patch('bajor.batch.training.create_job_tasks')
 def test_no_active_jobs(mock_create_job_tasks, mock_create_batch_job):
     schedule_job(fake_job_id, 'fake-manifest.csv')
-    mock_create_batch_job.assert_called_once_with(job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='training_0')
+    mock_create_batch_job.assert_called_once_with(job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='training_1')
     mock_create_job_tasks.assert_called_once_with(job_id=fake_job_id, run_opts='')
 
 

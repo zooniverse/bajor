@@ -296,7 +296,7 @@ def get_all_batch_job_stats():
 
 def schedule_job(job_id, manifest_path, run_opts=''):
     # Zoobot Azure Batch pool ID
-    pool_id = os.getenv('POOL_ID', 'training_0')
+    pool_id = os.getenv('POOL_ID', 'training_1')
 
     submitted_job_id = create_batch_job(
         job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
