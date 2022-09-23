@@ -42,11 +42,16 @@ def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     else:
       return True
 
+# Main app end points
+@app.get("/")
+async def root():
+    return {"revision": revision()}
 
-def active_batch_jobs():
-  return active_jobs_running()
+# SubAPI for training jobs on /training path
+# https://fastapi.tiangolo.com/advanced/sub-applications/
+training_app = FastAPI()
 
-@app.post("/jobs/", status_code=status.HTTP_201_CREATED)
+@training_app.post("/jobs/", status_code=status.HTTP_201_CREATED)
 async def create_job(job: Job, response: Response, authorized: bool = Depends(validate_basic_auth)) -> Job:
     if not authorized:
       raise HTTPException(
@@ -57,7 +62,7 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
 
     job_id = str(uuid.uuid4())
 
-    if active_batch_jobs():
+    if active_jobs_running():
       msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
       log.debug(msg)
       response.status_code = status.HTTP_409_CONFLICT
@@ -71,7 +76,7 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
       return job
 
 
-@app.get("/jobs/", status_code=status.HTTP_200_OK)
+@training_app.get("/jobs/", status_code=status.HTTP_200_OK)
 async def list_jobs(response: Response, active: bool = True, authorized: bool = Depends(validate_basic_auth)):
     if not authorized:
       raise HTTPException(
@@ -84,7 +89,7 @@ async def list_jobs(response: Response, active: bool = True, authorized: bool = 
     return get_active_batch_job_list() if active else get_non_active_batch_job_list()
 
 
-@app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
+@training_app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
 async def get_job_by_id(job_id: str, response: Response, authorized: bool = Depends(validate_basic_auth)):
     if not authorized:
       raise HTTPException(
@@ -96,9 +101,9 @@ async def get_job_by_id(job_id: str, response: Response, authorized: bool = Depe
     log.debug(f'Job status for id: {job_id}')
     return get_batch_job_status(job_id)
 
-@app.get("/")
-def root():
-    return {"revision": revision()}
+# mount the subapi at a path
+app.mount("/training", training_app)
+
 
 def start_app(reload=False):
     uvicorn.run(
@@ -107,6 +112,7 @@ def start_app(reload=False):
         port=int(port()),
         reload=reload
     )
+
 
 def start_dev_app():
     start_app(reload=True)

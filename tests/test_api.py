@@ -31,7 +31,7 @@ def test_read_api(mocked_client):
 
 def test_manifest_job_creation_without_auth_creds(mocked_client):
     response = mocked_client.post(
-        "/jobs/",
+        "/training/jobs/",
         json={"manifest_path": "test_manifest_file_path.csv"},
     )
     assert response.status_code == 401
@@ -41,7 +41,7 @@ def test_manifest_job_creation_without_auth_creds(mocked_client):
 @mock.patch.dict(os.environ, {"BASIC_AUTH_USERNAME": 'bajor', "BASIC_AUTH_PASSWORD": 'bajor'})
 def test_manifest_job_creation_incorrect_auth_creds(mocked_client):
     response = mocked_client.post(
-        "/jobs/",
+        "/training/jobs/",
         auth=('test', 'test'),
         json={"manifest_path": "test_manifest_file_path.csv"},
     )
@@ -50,7 +50,7 @@ def test_manifest_job_creation_incorrect_auth_creds(mocked_client):
 
 def test_manifest_job_creation_correct_auth_creds(mocked_client):
     response = mocked_client.post(
-        "/jobs/",
+        "/training/jobs/",
         auth=('bajor', 'bajor'),
         json={"manifest_path": "test_manifest_file_path.csv"},
     )
@@ -59,7 +59,7 @@ def test_manifest_job_creation_correct_auth_creds(mocked_client):
 @mock.patch.dict(os.environ, {"BASIC_AUTH_USERNAME": 'rojab', "BASIC_AUTH_PASSWORD": 'rojab'})
 def test_authentication_env_var_configs(mocked_client):
     response = mocked_client.post(
-        "/jobs/",
+        "/training/jobs/",
         auth=('rojab', 'rojab'),
         json={"manifest_path": "test_manifest_file_path.csv"},
     )
@@ -67,7 +67,7 @@ def test_authentication_env_var_configs(mocked_client):
 
 def test_batch_scheduling_code_is_called(mocked_client):
     response = mocked_client.post(
-        "/jobs/",
+        "/training/jobs/",
         auth=('bajor', 'bajor'),
         json={"manifest_path": "test_manifest_file_path.csv"},
     )
