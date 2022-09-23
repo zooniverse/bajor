@@ -63,7 +63,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # this is linked to how we built the batch system, see the batch system setup code in
             # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
             batchmodels.EnvironmentSetting(
-                name='TRAINING_TRAINING_CONTAINER_MOUNT_DIR',
+                name='TRAINING_CONTAINER_MOUNT_DIR',
                 value='training'),
             # the models storage container mount dir
             batchmodels.EnvironmentSetting(
