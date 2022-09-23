@@ -63,8 +63,12 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # this is linked to how we built the batch system, see the batch system setup code in
             # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
             batchmodels.EnvironmentSetting(
-                name='CONTAINER_MOUNT_DIR',
+                name='TRAINING_TRAINING_CONTAINER_MOUNT_DIR',
                 value='training'),
+            # the models storage container mount dir
+            batchmodels.EnvironmentSetting(
+                name='MODELS_CONTAINER_MOUNT_DIR',
+                value='models'),
             # set the manifest file path from the value supplied by the API
             batchmodels.EnvironmentSetting(
                 name='MANIFEST_PATH',
@@ -102,8 +106,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # NOTE: possible improvement - azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
     # this could be used for a task to copy the code from the default storage account to the job directory
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
-    create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
-    copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
+    create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
+    copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}\"',
         #
@@ -125,7 +129,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     #       like you can for the main task runs. Moving this code to the main task for now for logging purposes
     # promote trained model to a blob storage location for use in prediction system
     # promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
-    # promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
+    # promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR'
     # job.job_release_task = batchmodels.JobReleaseTask(command_line=f'/bin/bash -c \"set -ex; {promote_checkpoint_cmd}\"'
 
     # use the job manager task to do something with the job information
@@ -216,10 +220,10 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # so this location is relative to the container paths and can be modified at runtime
     # see jobPreparation task for code setup
     train_code_path = os.getenv('ZOOBOT_TRAIN_CMD', 'staging/train_model_on_catalog.py')
-    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
+    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
     # redirect the stdout to stderr for logging
-    promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
+    promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
     command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
