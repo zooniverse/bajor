@@ -283,14 +283,16 @@ def get_batch_job_list(job_list_options):
     return jobs_list
 
 def get_batch_job_status(job_id):
-    # use the raw response object vs digging into the CloudJob resource for summary data
-    # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get
-    job_status = azure_batch_client().job.get(job_id, raw=True)
-    return job_status.response.json()
+    # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations
+    job_status = azure_batch_client().job.get(job_id)
 
-    # longer term we can look at the job task lists as well
-    # tasks = azure_batch_client().task.list(job_id)
-    # task_list = [t for t in tasks]
+    return job_status.as_dict()
+
+def get_batch_job_tasks(job_id):
+    tasks = azure_batch_client().task.list(job_id)
+    task_list = [t.as_dict() for t in tasks]
+
+    return task_list
 
 # get a summary of what the batch service is up to
 # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get-all-lifetime-statistics

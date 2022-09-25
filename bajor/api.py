@@ -8,7 +8,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from honeybadger import contrib
 from logging.config import dictConfig
-from bajor.batch.training import schedule_job, active_jobs_running, get_batch_job_status, get_active_batch_job_list, get_non_active_batch_job_list
+from bajor.batch.training import schedule_job, active_jobs_running, get_batch_job_status, get_active_batch_job_list, get_non_active_batch_job_list, get_batch_job_tasks
 from bajor.env_helpers import api_basic_username, api_basic_password, revision, host, port
 from bajor.log_config import log_config
 
@@ -90,7 +90,7 @@ async def list_jobs(response: Response, active: bool = True, authorized: bool = 
 
 
 @training_app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
-async def get_job_by_id(job_id: str, response: Response, authorized: bool = Depends(validate_basic_auth)):
+async def get_job_by_id(job_id: str, response: Response, include_tasks: bool = True, authorized: bool = Depends(validate_basic_auth)):
     if not authorized:
       raise HTTPException(
           status_code=status.HTTP_401_UNAUTHORIZED,
@@ -99,7 +99,13 @@ async def get_job_by_id(job_id: str, response: Response, authorized: bool = Depe
       )
 
     log.debug(f'Job status for id: {job_id}')
-    return get_batch_job_status(job_id)
+    job_status = get_batch_job_status(job_id)
+
+    if include_tasks:
+      log.debug(f'Task stats for job id: {job_id}')
+      job_status['tasks'] = get_batch_job_tasks(job_id)
+
+    return job_status
 
 # mount the subapi at a path
 app.mount("/training", training_app)
