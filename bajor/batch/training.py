@@ -4,10 +4,7 @@ import logging, os, sys
 if os.getenv('DEBUG'):
   import pdb
 
-from datetime import datetime, timedelta
-
 import azure.batch.models as batchmodels
-from azure.storage.blob import ContainerSasPermissions, generate_container_sas
 
 from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
@@ -40,16 +37,6 @@ def schedule_job(job_id, manifest_path, run_opts=''):
 def create_batch_job(job_id, manifest_container_path, pool_id):
     log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
         manifest_container_path))
-    # TODO: add job completed / error reporting for job tracking data model (pgserver / redis / sqlite?)
-    # or possibly use container storage entires or even maybe container table storage
-    #   if len(image_paths) == 0:
-    #       job_status = get_job_status(
-    #           'completed', '0 images found in provided list of images.')
-    #       job_status_table.update_job_status(job_id, job_status)
-    #       return
-    # and then job status like it's good etc
-    # job_status = get_job_status('created', f'{num_images} images listed; submitting the job...')
-    # job_status_table.update_job_status(job_id, job_status)
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
     job = batchmodels.JobAddParameter(
@@ -150,23 +137,6 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     azure_batch_client().job.add(job)
     return job_id
 
-
-def storage_container_sas_url():
-    permissions = ContainerSasPermissions(read=True, write=True, list=True)
-    access_duration_hrs = os.getenv('SAS_ACCESS_DURATION_HOURS', 12)
-    storage_account_name = os.getenv(
-        'STORAGE_ACCOUNT_NAME', 'kadeactivelearning')
-    container_name = os.getenv('STORAGE_CONTAINER', 'training')
-    container_sas_token = generate_container_sas(
-        account_name=storage_account_name,
-        container_name=container_name,
-        account_key=os.getenv('STORAGE_ACCOUNT_KEY'),
-        permission=permissions,
-        expiry=datetime.utcnow() + timedelta(hours=access_duration_hrs))
-    # construct the SAS token storate account URL
-    return f'https://{storage_account_name}.blob.core.windows.net/{container_name}?{container_sas_token}'
-
-
 def training_job_dir(job_id):
     # append a timestamp to the job blob storage dir to help us navigate the job history timeline
     return f'jobs/{batch_jobs.job_submission_prefix(job_id)}'
@@ -182,7 +152,8 @@ def training_job_logs_path(job_id, task_id, suffix):
 
 def create_job_tasks(job_id, task_id=1, run_opts=''):
     # for persisting stdout and stderr log files in container storage
-    container_sas_url = storage_container_sas_url()
+    container_sas_url = batch_jobs.storage_container_sas_url(
+        os.getenv('TRAINING_STORAGE_CONTAINER', 'training'))
     # persist stdout and stderr (will be removed when node removed)
     # paths are relative to the Task working directory
     stderr_destination = batchmodels.OutputFileDestination(
