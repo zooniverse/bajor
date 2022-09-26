@@ -1,4 +1,6 @@
 import os
+import logging
+from logging.config import dictConfig
 
 # logger configuration in dict format
 log_config = {
@@ -23,3 +25,9 @@ log_config = {
         "BAJOR": {"handlers": ["default"], "level": os.environ.get('LOG_LEVEL', 'INFO')},
     },
 }
+
+
+# setup the logger
+dictConfig(log_config)
+
+log = logging.getLogger('BAJOR')
