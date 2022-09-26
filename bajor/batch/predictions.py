@@ -62,8 +62,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
                 value=manifest_container_path),
             # set the training results dir path
             batchmodels.EnvironmentSetting(
-                name='PREDICTIONS_JOB_RESULTS_PATH',
-                value=job_results_path(job_id))
+                name='PREDICTIONS_JOB_RESULTS_DIR',
+                value=job_results_dir(job_id))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
@@ -110,12 +110,13 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     return job_id
 
 
+# TODO: extract these as they are all common and isolated to their mounted containers
 def job_dir(job_id):
     # append a timestamp to the job blob storage dir to help us navigate the job history timeline
     return f'jobs/{batch_jobs.job_submission_prefix(job_id)}'
 
-def job_results_path(job_id):
-  return f'{job_dir(job_id)}/results/predictions.csv'
+def job_results_dir(job_id):
+  return f'{job_dir(job_id)}/results'
 
 
 def job_logs_path(job_id, task_id, suffix):
@@ -160,7 +161,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # ZOOBOT command for catalogue predictions!
     # see jobPreparation task for code setup
     train_code_path = os.getenv('ZOOBOT_PREDICTION_CMD', 'predict_on_catalog_with_model.py')
-    prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_PATH'
+    prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.csv'
     # redirect the stdout to stderr for logging
     command = f'/bin/bash -c \"set -ex; python {prediction_cmd}\"'
 
