@@ -1,5 +1,5 @@
 import os
-import uuid
+
 from fastapi import Depends, FastAPI, HTTPException, status, Response
 
 from bajor.models.job import Job
