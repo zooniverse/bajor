@@ -15,6 +15,7 @@ def create_job_id():
 
 def storage_container_sas_url(storage_container_name):
     permissions = ContainerSasPermissions(read=True, write=True, list=True)
+    # make sure this is long enough to complete the job
     access_duration_hrs = os.getenv('SAS_ACCESS_DURATION_HOURS', 12)
     storage_account_name = os.getenv('STORAGE_ACCOUNT_NAME', 'kadeactivelearning')
     container_name = storage_container_name,
@@ -25,7 +26,7 @@ def storage_container_sas_url(storage_container_name):
         permission=permissions,
         expiry=datetime.utcnow() + timedelta(hours=access_duration_hrs))
     # construct the SAS token storate account URL
-    return f'https://{storage_account_name}.blob.core.windows.net/{container_name}?{container_sas_token}'
+    return f'https://{storage_account_name}.blob.core.windows.net/{storage_container_name}?{container_sas_token}'
 
 
 def job_submission_prefix(job_id):
