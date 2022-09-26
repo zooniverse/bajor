@@ -5,6 +5,9 @@ import azure.batch.models as batchmodels
 
 from bajor.batch.client import azure_batch_client
 
+def creat_job_id():
+    return str(uuid.uuid4())
+
 def job_submission_prefix(job_id):
     job_submission_timestamp = datetime.now().isoformat(timespec='minutes')
     return f'{job_submission_timestamp}_{job_id}'

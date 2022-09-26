@@ -2,11 +2,12 @@ import os
 import uuid
 from fastapi import Depends, FastAPI, HTTPException, status, Response
 
-import bajor.batch.training as training
-from bajor.batch.jobs import get_batch_job_status, get_batch_job_tasks
 from bajor.models.job import Job
 from bajor.log_config import log
 from bajor.apis.basic_auth import validate_basic_auth
+
+import bajor.batch.training as training
+import bajor.batch.jobs as jobs
 
 if os.getenv('DEBUG'):
   import pdb
@@ -24,7 +25,7 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
         headers={"WWW-Authenticate": "Basic"},
       )
 
-    job_id = str(uuid.uuid4())
+    job_id = jobs.create_job_id()
 
     if training.active_jobs_running():
       msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
@@ -63,10 +64,10 @@ async def get_job_by_id(job_id: str, response: Response, include_tasks: bool = T
       )
 
     log.debug(f'Job status for id: {job_id}')
-    job_status = get_batch_job_status(job_id)
+    job_status = jobs.get_batch_job_status(job_id)
 
     if include_tasks:
       log.debug(f'Task stats for job id: {job_id}')
-      job_status['tasks'] = get_batch_job_tasks(job_id)
+      job_status['tasks'] = jobs.get_batch_job_tasks(job_id)
 
     return job_status
