@@ -20,7 +20,7 @@ def storage_container_sas_url(storage_container_name):
     container_name = storage_container_name,
     container_sas_token = generate_container_sas(
         account_name=storage_account_name,
-        container_name=container_name,
+        container_name=storage_container_name,
         account_key=os.getenv('STORAGE_ACCOUNT_KEY'),
         permission=permissions,
         expiry=datetime.utcnow() + timedelta(hours=access_duration_hrs))
