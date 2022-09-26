@@ -1,12 +1,32 @@
 # common batch job functions
-from datetime import datetime
+import uuid
+import os
+
+from datetime import datetime, timedelta
 
 import azure.batch.models as batchmodels
+from azure.storage.blob import ContainerSasPermissions, generate_container_sas
 
 from bajor.batch.client import azure_batch_client
 
-def creat_job_id():
+def create_job_id():
     return str(uuid.uuid4())
+
+
+def storage_container_sas_url(storage_container_name):
+    permissions = ContainerSasPermissions(read=True, write=True, list=True)
+    access_duration_hrs = os.getenv('SAS_ACCESS_DURATION_HOURS', 12)
+    storage_account_name = os.getenv('STORAGE_ACCOUNT_NAME', 'kadeactivelearning')
+    container_name = storage_container_name,
+    container_sas_token = generate_container_sas(
+        account_name=storage_account_name,
+        container_name=container_name,
+        account_key=os.getenv('STORAGE_ACCOUNT_KEY'),
+        permission=permissions,
+        expiry=datetime.utcnow() + timedelta(hours=access_duration_hrs))
+    # construct the SAS token storate account URL
+    return f'https://{storage_account_name}.blob.core.windows.net/{container_name}?{container_sas_token}'
+
 
 def job_submission_prefix(job_id):
     job_submission_timestamp = datetime.now().isoformat(timespec='minutes')
