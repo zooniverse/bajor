@@ -6,7 +6,8 @@ import pandas as pd
 import pytorch_lightning as pl
 
 from zoobot.pytorch.estimators import define_model
-from zoobot.pytorch.predictions import predict_on_catalog
+# use our own version of the predict on catalog package
+import predict_on_catalog
 from zoobot.shared import label_metadata
 
 def load_model_from_checkpoint(checkpoint_path):
@@ -17,7 +18,7 @@ def load_model_from_checkpoint(checkpoint_path):
 def label_cols_from_metadata():
     # setup decals 5 & 8 labels
     question_answer_pairs = {}
-    # question_answer_pairs.update(label_metadata.decals_dr5_ortho_pairs)
+    question_answer_pairs.update(label_metadata.decals_dr5_ortho_pairs)
     question_answer_pairs.update(label_metadata.decals_dr8_ortho_pairs)
     # long term predict on all available decals data columns (dr12, dr5, dr8 etc)
     # question_answer_pairs = label_metadata.decals_all_campaigns_ortho_pairs
@@ -45,6 +46,7 @@ if __name__ == '__main__':
 
     logging.info(f'Begin predictions on catalog: {args.catalog_loc}')
 
+    # take a csv file for the catalog, perhaps if these are very large we can use parquet format
     catalog = pd.concat(map(pd.read_csv, args.catalog_loc), ignore_index=True)
 
     model = load_model_from_checkpoint(args.checkpoint_path)
