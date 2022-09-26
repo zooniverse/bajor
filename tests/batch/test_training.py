@@ -1,13 +1,15 @@
-from bajor.batch.training import schedule_job, create_batch_job, create_job_tasks, active_jobs_running
+from bajor.batch.training import schedule_job, create_batch_job, create_job_tasks
+from bajor.batch.jobs import active_jobs_running
 import uuid, os
 from unittest import mock
 
 fake_job_id = str(uuid.uuid4())
+test_pool = 'pool'
 
-@mock.patch('bajor.batch.training.get_batch_job_list')
+@mock.patch('bajor.batch.jobs.get_batch_job_list')
 def test_active_jobs_running(mock_get_batch_job_list):
     mock_get_batch_job_list.return_value = ["FakeJob"]
-    assert(active_jobs_running() == True)
+    assert(active_jobs_running(test_pool) == True)
 
 
 @mock.patch('bajor.batch.training.create_batch_job')

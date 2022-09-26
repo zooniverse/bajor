@@ -1,34 +1,40 @@
-# launching batch processing functions go here
-import logging, uuid, os, sys
+# training job specific functions
+import logging, os, sys
 
 if os.getenv('DEBUG'):
   import pdb
 
-from functools import cache
-from datetime import datetime, timezone, timedelta
-
-from bajor.env_helpers import api_basic_username, api_basic_password, api_job_complete_url
+from datetime import datetime, timedelta
 
 import azure.batch.models as batchmodels
-from azure.batch import BatchServiceClient
-from azure.common.credentials import ServicePrincipalCredentials
 from azure.storage.blob import ContainerSasPermissions, generate_container_sas
 
-log = logging.getLogger('BAJOR')
+from bajor.batch.client import azure_batch_client
+import bajor.batch.jobs as batch_jobs
+from bajor.log_config import log
+# Zoobot Azure Batch training pool ID
+training_pool_id = os.getenv('POOL_ID', 'training_1')
 
-@cache
-def azure_batch_client():
-    credentials = ServicePrincipalCredentials(
-        client_id=os.getenv('APP_CLIENT_ID'),
-        secret=os.getenv('APP_CLIENT_SECRET'),
-        tenant=os.getenv('APP_TENANT_ID'),
-        resource='https://batch.core.windows.net/'
-    )
-    return BatchServiceClient(
-        credentials=credentials,
-        batch_url=os.getenv('BATCH_ACCOUNT_URL',
-                            'https://zoobot.eastus.batch.azure.com')
-    )
+
+# wrapper functions to isolate the jobs to the training pool
+def active_jobs_running():
+    return batch_jobs.active_jobs_running(training_pool_id)
+
+def get_active_batch_job_list():
+  return batch_jobs.get_active_batch_job_list(training_pool_id)
+
+def get_non_active_batch_job_list():
+  return batch_jobs.get_non_active_batch_job_list(training_pool_id)
+
+# schedule a training job
+def schedule_job(job_id, manifest_path, run_opts=''):
+    submitted_job_id = create_batch_job(
+        job_id=job_id, manifest_container_path=manifest_path, pool_id=training_pool_id)
+    job_task_submission_status = create_job_tasks(
+        job_id=job_id, run_opts=run_opts)
+
+    # return the submitted job_id and task submission status dict
+    return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
 def create_batch_job(job_id, manifest_container_path, pool_id):
     log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
@@ -160,13 +166,9 @@ def storage_container_sas_url():
     return f'https://{storage_account_name}.blob.core.windows.net/{container_name}?{container_sas_token}'
 
 
-def job_submission_prefix(job_id):
-    job_submission_timestamp = datetime.now().isoformat(timespec='minutes')
-    return f'{job_submission_timestamp}_{job_id}'
-
 def training_job_dir(job_id):
     # append a timestamp to the job blob storage dir to help us navigate the job history timeline
-    return f'jobs/{job_submission_prefix(job_id)}'
+    return f'jobs/{batch_jobs.job_submission_prefix(job_id)}'
 
 
 def training_job_results_dir(job_id):
@@ -254,62 +256,9 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
             failed_task_submission = True
 
     if failed_task_submission:
-        return task_submission_status(state='error', message=task_result.error)
+        return batch_jobs.task_submission_status(state='error', message=task_result.error)
     else:
-        return task_submission_status(state='submitted')
-
-
-def task_submission_status(state, message='Job submitted successfully'):
-    return {"status": state, "message": message}
-
-def active_jobs_running():
-    active_jobs = batchmodels.JobListOptions(
-      filter='state eq \'active\'',
-      select='id'
-    )
-    num_active_jobs = len(get_batch_job_list(active_jobs))
-    return num_active_jobs > 0
-
-def get_non_active_batch_job_list():
-    return get_batch_job_list(batchmodels.JobListOptions(filter='state ne \'active\''))
-
-def get_active_batch_job_list():
-    return get_batch_job_list(batchmodels.JobListOptions(filter='state eq \'active\''))
-
-def get_batch_job_list(job_list_options):
-    jobs_generator = azure_batch_client().job.list(
-        job_list_options=job_list_options)
-    jobs_list = [j for j in jobs_generator]
-    return jobs_list
-
-def get_batch_job_status(job_id):
-    # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations
-    job_status = azure_batch_client().job.get(job_id)
-
-    return job_status.as_dict()
-
-def get_batch_job_tasks(job_id):
-    tasks = azure_batch_client().task.list(job_id)
-    task_list = [t.as_dict() for t in tasks]
-
-    return task_list
-
-# get a summary of what the batch service is up to
-# https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.operations.joboperations?view=azure-python#azure-batch-operations-joboperations-get-all-lifetime-statistics
-def get_all_batch_job_stats():
-    job_stats = azure_batch_client().job.get_all_lifetime_statistics
-    return job_stats.response.json()
-
-def schedule_job(job_id, manifest_path, run_opts=''):
-    # Zoobot Azure Batch pool ID
-    pool_id = os.getenv('POOL_ID', 'training_1')
-
-    submitted_job_id = create_batch_job(
-        job_id=job_id, manifest_container_path=manifest_path, pool_id=pool_id)
-    job_task_submission_status = create_job_tasks(job_id=job_id, run_opts=run_opts)
-
-    # return the submitted job_id and task submission status dict
-    return { "submitted_job_id": submitted_job_id, "job_task_status": job_task_submission_status }
+        return batch_jobs.task_submission_status(state='submitted')
 
 
 if __name__ == '__main__':
@@ -318,9 +267,4 @@ if __name__ == '__main__':
         format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
         stream = sys.stdout
     )
-
-    # pdb.set_trace()
-    # job_id = str(uuid.uuid4())
-    # manifest_path = os.getenv('MANIFEST_PATH')
-    # schedule_job(job_id, manifest_path)
 
