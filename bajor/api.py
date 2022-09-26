@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from honeybadger import contrib
 from bajor.env_helpers import revision, host, port
 from bajor.apis.training import training_app
+from bajor.apis.predictions import predictions_app
 
 if os.getenv('DEBUG'):
   import pdb
@@ -18,9 +19,9 @@ async def root():
     return {"revision": revision()}
 
 # SubAPIs
-# mount the subapi at a path
+# mount the subapi's at path prefixes
 app.mount("/training", training_app)
-
+app.mount("/prediction", predictions_app)
 
 def start_app(reload=False):
     uvicorn.run(
