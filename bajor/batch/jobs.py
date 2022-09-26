@@ -16,7 +16,7 @@ def task_submission_status(state, message='Job submitted successfully'):
 
 def active_jobs_running(pool_id):
     active_jobs = batchmodels.JobListOptions(
-        filter=f"state eq 'active' AND executionInfo/poolId eq '{pool_id}'",
+        filter=f"state eq 'active' and executionInfo/poolId eq '{pool_id}'",
         select='id'
     )
     num_active_jobs = len(get_batch_job_list(active_jobs))
@@ -24,11 +24,11 @@ def active_jobs_running(pool_id):
 
 
 def get_non_active_batch_job_list(pool_id):
-    return get_batch_job_list(batchmodels.JobListOptions(filter="executionInfo/poolId eq '{pool_id}' AND state ne 'active'"))
+    return get_batch_job_list(batchmodels.JobListOptions(filter=f"executionInfo/poolId eq '{pool_id}' and state ne 'active'"))
 
 
 def get_active_batch_job_list(pool_id):
-    return get_batch_job_list(batchmodels.JobListOptions(filter="executionInfo/poolId eq '{pool_id}' AND state eq 'active'"))
+    return get_batch_job_list(batchmodels.JobListOptions(filter=f"executionInfo/poolId eq '{pool_id}' and state eq 'active'"))
 
 
 def get_batch_job_list(job_list_options):

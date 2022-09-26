@@ -12,6 +12,7 @@ from azure.storage.blob import ContainerSasPermissions, generate_container_sas
 from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
 from bajor.log_config import log
+
 # Zoobot Azure Batch training pool ID
 training_pool_id = os.getenv('POOL_ID', 'training_1')
 
