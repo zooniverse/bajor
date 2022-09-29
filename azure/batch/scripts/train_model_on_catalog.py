@@ -26,6 +26,8 @@ if __name__ == '__main__':
                         type=str, action='append')
     parser.add_argument('--num-workers',
                         dest='num_workers', type=int, default=int((os.cpu_count())))
+    parser.add_argument('--prefetch-factor',
+                        dest='prefetch_factor', type=int, default=4)
     parser.add_argument('--architecture',
                         dest='model_architecture', type=str, default='efficientnet')
     parser.add_argument('--epochs', dest='epochs', type=int, default=1000)
@@ -121,6 +123,7 @@ if __name__ == '__main__':
         nodes=args.nodes,
         gpus=args.gpus,
         num_workers=args.num_workers,
+        prefetch_factor=args.prefetch_factor,
         mixed_precision=args.mixed_precision,
         wandb_logger=wandb_logger,
         # checkpointing setup, e.g. supervised loss values can be

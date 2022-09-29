@@ -6,7 +6,7 @@ import pandas as pd
 import pytorch_lightning as pl
 
 from zoobot.pytorch.estimators import define_model
-# use our own version of the predict on catalog package
+# from zoobot.pytorch.predictions import predict_on_catalog
 import predict_on_catalog
 from zoobot.shared import label_metadata
 
@@ -38,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--catalog', dest='catalog_loc', type=str, action='append')
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=1)
     parser.add_argument('--num-workers', dest='num_workers', type=int, default=int((os.cpu_count())))
+    parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=4)
     # V100 GPU can handle 128 - can look at --mixed-precision opt to decrease the ram use
     parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
@@ -55,7 +56,8 @@ if __name__ == '__main__':
     # used for testing on local dev machine
     datamodule_args = {
         'batch_size': args.batch_size,
-        'num_workers': args.num_workers
+        'num_workers': args.num_workers,
+        'prefetch_factor': args.prefetch_factor
     }
     trainer_args = {
         'gpus': args.gpus,
