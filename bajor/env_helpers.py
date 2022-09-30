@@ -18,3 +18,11 @@ def host():
 
 def port():
     return os.environ.get('PORT', '8000')
+
+def max_num_pool_nodes(pool_id):
+    if(pool_id == 'training_1'):
+        return os.environ.get('MAX_NODES_TRAINING', 2)
+    elif(pool_id == 'predictions_0'):
+        return os.environ.get('MAX_NODES_PREDICTION', 2)
+    else:
+        return 0

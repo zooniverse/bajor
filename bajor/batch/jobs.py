@@ -3,6 +3,7 @@ import uuid
 import os
 
 from datetime import datetime, timedelta
+from bajor.env_helpers import max_num_pool_nodes
 
 import azure.batch.models as batchmodels
 from azure.storage.blob import ContainerSasPermissions, generate_container_sas
@@ -44,7 +45,7 @@ def active_jobs_running(pool_id):
         select='id'
     )
     num_active_jobs = len(get_batch_job_list(active_jobs))
-    return num_active_jobs > 0
+    return num_active_jobs >= max_num_pool_nodes(pool_id)
 
 
 def get_non_active_batch_job_list(pool_id):
