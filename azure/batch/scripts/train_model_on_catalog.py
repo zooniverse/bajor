@@ -27,9 +27,9 @@ if __name__ == '__main__':
     parser.add_argument('--mission-catalog', dest='mission_catalog_loc',
                         type=str, action='append')
     parser.add_argument('--num-workers',
-                        dest='num_workers', type=int, default=int((os.cpu_count())))
+                        dest='num_workers', type=int, default=11)  # benchmarks show 11 work on our VM types - was int((os.cpu_count())
     parser.add_argument('--prefetch-factor',
-                        dest='prefetch_factor', type=int, default=4)
+                        dest='prefetch_factor', type=int, default=9) # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
     parser.add_argument('--architecture',
                         dest='model_architecture', type=str, default='efficientnet')
     parser.add_argument('--epochs', dest='epochs', type=int, default=1000)
@@ -51,7 +51,7 @@ if __name__ == '__main__':
         but may be unexpected and mess with e.g. GradCAM techniques.'),
     parser.add_argument('--dropout-rate', dest='dropout_rate',
                         default=0.2, type=float)
-    parser.add_argument('--mixed-precision', dest='mixed_precision', default=False, action='store_true',
+    parser.add_argument('--mixed-precision', dest='mixed_precision', default=True, action='store_true',
                         help='If true, use automatic mixed precision (via PyTorch Lightning) to reduce GPU memory use (~x2). Else, use full (32 bit) precision')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true',
                         help='If true, cut each catalog down to 5k galaxies (for quick training). Should cause overfitting.')
