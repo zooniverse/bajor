@@ -62,10 +62,10 @@ python
 >>> print(torch.cuda.device_count())
 >>> print(torch.cuda.current_device())
 >>> print(torch.cuda.get_device_name(0))
+# or via the published zoobot code at <https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py>
+>>> from zoobot.pytorch.estimators import cuda_check
 >>> quit()
 ```
-
-or via existing code at <https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py>
 
 You can now exit/stop the container.
 
