@@ -16,10 +16,10 @@ docker compose run --service-ports --rm zoobot
 # do your dev work and test it!
 
 # e.g. test your training system is working
- poetry run python scripts/train_model_on_catalog.py --experiment-dir data/ --resize-size 32 --epochs 3 --batch-size 3 --accelerator cpu --gpus 0 --num-workers 2 --skip-mission-catalog --debug --catalog data/training_catalogues/workflow-3598-2022-05-cam-test.csv
+ python scripts/train_model_on_catalog.py --experiment-dir data/ --resize-size 32 --epochs 3 --batch-size 3 --accelerator cpu --gpus 0 --num-workers 2 --skip-mission-catalog --debug --catalog data/training_catalogues/workflow-3598-2022-05-cam-test.csv
 
 # or test a prediction system
- poetry run python scripts/predict_catalog_with_model.py --checkpoint-path data/pretrained_models/pytorch/zoobot.ckpt --catalog data/prediction_catalogs/predictions_test_catalog.csv --save-path data/results/predictions_results.csv --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
+ python scripts/predict_catalog_with_model.py --checkpoint-path data/pretrained_models/pytorch/zoobot.ckpt --catalog data/prediction_catalogs/predictions_test_catalog.csv --save-path data/results/predictions_results.csv --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
 
 # when you are ready to publish the image follow the steps below
 ```
