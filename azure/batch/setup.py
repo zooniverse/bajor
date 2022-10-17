@@ -7,9 +7,10 @@ setuptools.setup(
     author_email="contact@zooniverse.org",
     description="Zoobot batch processing system",
     url="https://github.com/zooniverse/bajor/blob/main/azure/batch/README.md",
+    license='Apache License 2.0',
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: GNU General Public License (GPL)",
+        'License :: OSI Approved :: Apache Software License'
         "Operating System :: OS Independent",
         "Development Status :: 4 - Beta",
         "Environment :: GPU :: NVIDIA CUDA"
