@@ -19,3 +19,7 @@ __pycache__/
 
 # ignore env files for docker-compose setup
 env*.list
+
+# ignore the zoobot batch dev/testing env artefacts
+azure/batch/lightning_logs/*
+azure/batch/data/external
