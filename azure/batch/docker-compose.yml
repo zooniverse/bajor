@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  zoobot:
+    image: zoobot:cuda
+    build:
+      context:  ./
+      dockerfile: Dockerfile
+    volumes:
+      # inject the code at run time to allow edits etc
+      - ./:/usr/src/zoobot
+      # inject this symlink external data dir as docker mounts it as a file :(
+      # symlink your data dir into the external data dir so it appears in your container
+      - ./data/external/:/usr/src/zoobot/data/external/
+

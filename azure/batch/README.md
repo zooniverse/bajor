@@ -2,6 +2,21 @@
 
 Zoobot is built form this Github Repo <https://github.com/mwalmsley/zoobot/>
 
+## Build a development version of the docker image
+
+Add features by testing training and prediction scripts via the same docker image env that the production batch system will use
+
+This image depends on the upstream Zoobot project <https://github.com/mwalmsley/zoobot#direct-use>
+
+``` sh
+# build the image for use
+docker-compose build
+# run a bash console in the dev container
+docker compose run --service-ports --rm zoobot
+# do your dev work and test it!
+# when you are ready to publish the image follow the steps below
+```
+
 ## Build the Docker image for Azure Batch node pools
 
 We need to build a Docker image with the necessary packages (ML system Pytorch or TensorFlow) to run the code in the Azure Batch ecosystem.
