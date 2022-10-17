@@ -22,6 +22,8 @@ if __name__ == '__main__':
     # expects catalog, not tfrecords
     parser.add_argument('--catalog', dest='catalog_loc',
                         type=str, action='append')
+    parser.add_argument('--skip-mission-catalog', dest='skip_mission_catalog', default=False, action='store_true',
+                        help='If true, skip training on the main catalog and train on a small subset and must be used with --debug flag')
     parser.add_argument('--mission-catalog', dest='mission_catalog_loc',
                         type=str, action='append')
     parser.add_argument('--num-workers',
@@ -74,29 +76,39 @@ if __name__ == '__main__':
 
     # load the mission catalog parquet files
     # Note: again - these must have the same column format if loading multiple files
-    mission_catalog = pd.concat(
-        map(pd.read_parquet, args.mission_catalog_loc),
-        ignore_index=True)
+    if args.skip_mission_catalog and not args.debug:
+        raise Exception(
+            'Skipping mission catalog without using --debug flag is not allowed. Fleeing to safety...')
+    elif args.debug and args.skip_mission_catalog:
+        # debugging mode only use the kade catalog
+        # for dev / testing - note this will produce junk results!
+        # but will test the code works :)
+        catalog = kade_catalog
+    else:
+        mission_catalog = pd.concat(
+            map(pd.read_parquet, args.mission_catalog_loc),
+            ignore_index=True)
 
-    # extract only the kade manifest column data from the larger mission catalog data
-    # this allows us to modify the kade manifest and automatically include the mission column data
-    # as we progress with adding new mission data (e.g. decals 1&2 etc) to kade exports
-    subset_mission_catalog = mission_catalog[kade_catalog.columns]
+        # extract only the kade manifest column data from the larger mission catalog data
+        # this allows us to modify the kade manifest and automatically include the mission column data
+        # as we progress with adding new mission data (e.g. decals 1&2 etc) to kade exports
+        subset_mission_catalog = mission_catalog[kade_catalog.columns]
 
-    # combine the catalog files for use in the zooboe training system
-    catalog = pd.concat([kade_catalog, subset_mission_catalog], ignore_index=True)
+        # combine the catalog files for use in the zooboe training system
+        catalog = pd.concat([kade_catalog, subset_mission_catalog], ignore_index=True)
+
+        # debug mode - only use a subset of the data
+        if args.debug:
+          logging.warning(
+              'Using debug mode: cutting catalog down to 5k galaxies')
+          catalog = catalog.sample(5000).reset_index(drop=True)
+
 
     # print the first and last file loc of the loaded catalog
     logging.info('Catalog has {} rows'.format(len(catalog.index)))
     logging.info('First file_loc {}'.format(catalog['file_loc'].iloc[0]))
     logging.info('Last file_loc {}'.format(
         catalog['file_loc'].iloc[len(catalog.index) - 1]))
-
-    # debug mode
-    if args.debug:
-        logging.warning(
-            'Using debug mode: cutting catalog down to 5k galaxies')
-        catalog = catalog.sample(5000).reset_index(drop=True)
 
     if args.wandb:
         wandb_logger = WandbLogger(
