@@ -23,15 +23,6 @@ RUN apt-get remove -y python3-pip
 RUN ln -s /usr/local/bin/pip3 /usr/bin/pip
 RUN ln -s /usr/local/bin/pip3 /usr/bin/pip3
 
-# install poetry for package managment
-# RUN pip install poetry
-# install dependencies for building the image
-#COPY pyproject.toml ./
-#COPY poetry.lock ./
-# avoid setting up a venv for the dependency installs
-# RUN POETRY_VIRTUALENVS_CREATE=false poetry install
-
-# uset setuptools for package management
+# install our dependencies (see setup.py)
 COPY setup.py .
 RUN pip install .
-
