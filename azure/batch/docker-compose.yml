@@ -11,5 +11,5 @@ services:
       - ./:/usr/src/zoobot
       # inject this symlink external data dir as docker mounts it as a file :(
       # symlink your data dir into the external data dir so it appears in your container
-      - ./data/external/:/usr/src/zoobot/data/external/
+      # - ./data/external/:/usr/src/zoobot/data/
 
