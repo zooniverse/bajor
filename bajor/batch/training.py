@@ -188,8 +188,9 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
 
     tasks = []
     # ZOOBOT command for catalogue based training!
-    # TODO: add links to the Batch Scheduling system setup
-    #       container for zoobot built in etc to show how this works
+    # see azure/batch/README.md for details on how to setup
+    # the container for zoobot system
+    #
     # train_cmd file path is copied from blob storage into this runtime container
     # so this location is relative to the container paths and can be modified at runtime
     # see jobPreparation task for code setup

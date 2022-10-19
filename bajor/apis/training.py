@@ -2,12 +2,12 @@ import os
 
 from fastapi import Depends, FastAPI, HTTPException, status, Response
 
-from bajor.models.job import Job
+from bajor.models.job import TrainingJob
 from bajor.log_config import log
 from bajor.apis.basic_auth import validate_basic_auth
 
 import bajor.batch.training as training
-import bajor.batch.jobs as jobs
+import bajor.batch.jobs as batch_jobs
 
 if os.getenv('DEBUG'):
   import pdb
@@ -17,7 +17,7 @@ if os.getenv('DEBUG'):
 training_app = FastAPI()
 
 @training_app.post("/jobs/", status_code=status.HTTP_201_CREATED)
-async def create_job(job: Job, response: Response, authorized: bool = Depends(validate_basic_auth)) -> Job:
+async def create_job(job: TrainingJob, response: Response, authorized: bool = Depends(validate_basic_auth)) -> TrainingJob:
     if not authorized:
       raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -25,7 +25,7 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
         headers={"WWW-Authenticate": "Basic"},
       )
 
-    job_id = jobs.create_job_id()
+    job_id = batch_jobs.create_job_id()
 
     if training.active_jobs_running():
       msg = 'Active Jobs are running in the batch system - please wait till they are fininshed processing.'
@@ -34,7 +34,10 @@ async def create_job(job: Job, response: Response, authorized: bool = Depends(va
       return { "state": "error", "message": msg }
     else:
       log.debug('No active jobs running - lets get scheduling!')
-      results = training.schedule_job(job_id, job.manifest_path, job.run_opts)
+      # remove the leading / from the manifest url
+      # as it's added via the blob storage paths in schedule_job
+      manifest_path = job.manifest_path.lstrip('/')
+      results = training.schedule_job(job_id, manifest_path, job.run_opts)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 
@@ -64,10 +67,10 @@ async def get_job_by_id(job_id: str, response: Response, include_tasks: bool = T
       )
 
     log.debug(f'Job status for id: {job_id}')
-    job_status = jobs.get_batch_job_status(job_id)
+    job_status = batch_jobs.get_batch_job_status(job_id)
 
     if include_tasks:
       log.debug(f'Task stats for job id: {job_id}')
-      job_status['tasks'] = jobs.get_batch_job_tasks(job_id)
+      job_status['tasks'] = batch_jobs.get_batch_job_tasks(job_id)
 
     return job_status
