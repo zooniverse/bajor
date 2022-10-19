@@ -34,10 +34,8 @@ async def create_job(job: TrainingJob, response: Response, authorized: bool = De
       return { "state": "error", "message": msg }
     else:
       log.debug('No active jobs running - lets get scheduling!')
-      # remove the leading / from the manifest url
-      # as it's added via the blob storage paths in schedule_job
-      manifest_path = job.manifest_path.lstrip('/')
-      results = training.schedule_job(job_id, manifest_path, job.run_opts)
+
+      results = training.schedule_job(job_id, job.stripped_manifest_path, job.run_opts)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 
