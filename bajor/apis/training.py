@@ -35,7 +35,7 @@ async def create_job(job: TrainingJob, response: Response, authorized: bool = De
     else:
       log.debug('No active jobs running - lets get scheduling!')
 
-      results = training.schedule_job(job_id, job.stripped_manifest_path, job.run_opts)
+      results = training.schedule_job(job_id, job.stripped_manifest_path(), job.run_opts)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 
