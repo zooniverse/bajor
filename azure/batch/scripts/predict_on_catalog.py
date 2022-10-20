@@ -26,6 +26,10 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       # load the data from the remote image URL
       url = galaxy['image_url']
       try:
+          # Currently only supporting JPEG images
+          # TODO: support other subject image formats (PNG etc)
+          # Note: the model must be trained on similar image formats
+          #
           # streaming the file as it is used (saves on memory)
           r = requests.get(url, stream=True)
           decoded_jpeg = galaxy_dataset.decode_jpeg(r.raw.read())
