@@ -1,6 +1,7 @@
 import os
 import logging
 import argparse
+import json
 
 import pandas as pd
 import pytorch_lightning as pl
@@ -35,7 +36,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--checkpoint-path', dest='checkpoint_path', type=str)
     parser.add_argument('--save-path', dest='save_loc', type=str)
-    parser.add_argument('--catalog', dest='catalog_loc', type=str, action='append')
+    parser.add_argument('--catalog-url', dest='catalog_url', type=str)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=1)
     parser.add_argument('--num-workers', dest='num_workers', type=int, default=int((os.cpu_count())))
     parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=4)
@@ -45,10 +46,25 @@ if __name__ == '__main__':
     parser.add_argument('--gpus', default=1, type=int)
     args = parser.parse_args()
 
-    logging.info(f'Begin predictions on catalog: {args.catalog_loc}')
+    logging.info(f'Begin predictions on catalog: {args.catalog_url}')
 
-    # take a csv file for the catalog, perhaps if these are very large we can use parquet format
-    catalog = pd.concat(map(pd.read_csv, args.catalog_loc), ignore_index=True)
+    # load the catalog from a remote JSON url
+    # for really large remote files they could be parquet format?!
+
+    # expected manifest format from hamlet has no column headers
+    # it's json arrays of data with the following list of array object
+    # catalog[0] = first column being the URL of the prediction image
+    # catalog[1] = second colum being the image metadata (including subject_id)
+    import pdb
+    pdb.set_trace()
+
+    raw_json_catalog = pd.read_json(args.catalog_url)
+    # extract and convert the json metadata column
+    # https: // pandas.pydata.org/pandas-docs/stable/reference/api/pandas.json_normalize.html
+    catalog = pd.json_normalize(raw_json_catalog[1].apply(json.loads))
+    # add in the image url as it's used in the
+    catalog['image_url'] = raw_json_catalog[0]
+
 
     model = load_model_from_checkpoint(args.checkpoint_path)
 

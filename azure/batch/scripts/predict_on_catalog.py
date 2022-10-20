@@ -22,30 +22,18 @@ from pytorch_galaxy_datasets import galaxy_datamodule, galaxy_dataset
 
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
   def __getitem__(self, idx):
-      #the index is id_str so can use that for quick search on 1M+ catalo
-      # galaxy = self._catalog.loc[idx]
       galaxy = self.catalog.iloc[idx]
-      # option A
-      # img_path = galaxy['file_loc']
-      # image = read_image(img_path) # PIL under the hood: Returns CHW Tensor.
-      # option B - tiny bit faster when CPU-limited
-      url = galaxy['file_loc']
+      # load the data from the remote image URL
+      url = galaxy['image_url']
       try:
-          # downloading the file in full before use
-          # from io import BytesIO
-          # r = requests.get(url)
-          # image = Image.open(BytesIO(response.content))
-          # decoded_jpeg = galaxy_dataset.decode_jpeg(BytesIO(r.content).read())
-          #
           # streaming the file as it is used (saves on memory)
           r = requests.get(url, stream=True)
           decoded_jpeg = galaxy_dataset.decode_jpeg(r.raw.read())
           # HWC PIL image via simplejpeg
           image = Image.fromarray(decoded_jpeg)
       except Exception as e:
-          logging.critical('Cannot load {}'.format(galaxy['file_loc']))
+          logging.critical('Cannot load {}'.format(galaxy['image_url']))
           raise e
-      # label = get_galaxy_label(galaxy, self.label_cols)
       # avoid the label lookups as they aren't used in the prediction
       label = []
 
@@ -72,10 +60,8 @@ class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
 
 
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
-
-    image_id_strs = list(catalog['id_str'])
-    # perhapse include the subject_id for use in downstream systems
-    # image_id_strs = list(catalog['subject_id'])
+    # extract the uniq image identifiers
+    image_id_strs = list(catalog['subject_id'])
 
     predict_datamodule = PredictionGalaxyDataModule(
         label_cols=label_cols,
@@ -114,8 +100,8 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     # range(n_samples) list comprehension repeats this, for dropout-permuted predictions. Stack to create new last axis.
     # final shape (n_galaxies, n_answers, n_samples)
     predictions = torch.stack([torch.concat(trainer.predict(model, predict_datamodule), dim=0) for n in range(n_samples)], dim=2).numpy()
-    logging.info('Predictions complete - {}'.format(predictions.shape))
 
+    logging.info('Predictions complete - {}'.format(predictions.shape))
     logging.info(f'Saving predictions to {save_loc}')
 
     if save_loc.endswith('.csv'):      # save as pandas df
