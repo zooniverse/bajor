@@ -24,18 +24,18 @@ def get_non_active_batch_job_list():
   return batch_jobs.get_non_active_batch_job_list(predictions_pool_id)
 
 # schedule a training job
-def schedule_job(job_id, manifest_path, run_opts=''):
+def schedule_job(job_id, manifest_url, run_opts=''):
     submitted_job_id = create_batch_job(
-        job_id=job_id, manifest_container_path=manifest_path, pool_id=predictions_pool_id)
+        job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id)
     job_task_submission_status = create_job_tasks(
         job_id=job_id, run_opts=run_opts)
 
     # return the submitted job_id and task submission status dict
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
-def create_batch_job(job_id, manifest_container_path, pool_id):
-    log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
-        manifest_container_path))
+
+def create_batch_job(job_id, manifest_url, pool_id):
+    log.debug('server_job, create_batch_job, using manifest at url: {}'.format(manifest_url))
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
     job = batchmodels.JobAddParameter(
@@ -58,8 +58,8 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
                 value='models'),
             # set the manifest file path from the value supplied by the API
             batchmodels.EnvironmentSetting(
-                name='MANIFEST_PATH',
-                value=manifest_container_path),
+                name='MANIFEST_URL',
+                value=manifest_url),
             # set the training results dir path
             batchmodels.EnvironmentSetting(
                 name='PREDICTIONS_JOB_RESULTS_DIR',
@@ -161,7 +161,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # ZOOBOT command for catalogue predictions!
     # see jobPreparation task for code setup
     train_code_path = os.getenv('ZOOBOT_PREDICTION_CMD', 'predict_catalog_with_model.py')
-    prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.csv'
+    prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.csv'
     # redirect the stdout to stderr for logging
     command = f'/bin/bash -c \"set -ex; python {prediction_cmd}\"'
 
