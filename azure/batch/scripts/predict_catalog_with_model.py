@@ -55,16 +55,12 @@ if __name__ == '__main__':
     # it's json arrays of data with the following list of array object
     # catalog[0] = first column being the URL of the prediction image
     # catalog[1] = second colum being the image metadata (including subject_id)
-    import pdb
-    pdb.set_trace()
-
     raw_json_catalog = pd.read_json(args.catalog_url)
     # extract and convert the json metadata column
     # https: // pandas.pydata.org/pandas-docs/stable/reference/api/pandas.json_normalize.html
     catalog = pd.json_normalize(raw_json_catalog[1].apply(json.loads))
     # add in the image url as it's used in the
     catalog['image_url'] = raw_json_catalog[0]
-
 
     model = load_model_from_checkpoint(args.checkpoint_path)
 
