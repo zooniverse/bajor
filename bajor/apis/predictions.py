@@ -35,10 +35,6 @@ async def create_job(job: PredictionJob, response: Response, authorized: bool = 
       return { "state": "error", "message": msg }
     else:
       log.debug('No active jobs running - lets get scheduling!')
-      # TODO: update to use a public URL for the manifest
-      # vs a path on the blob storage system
-      # that way our creation client doesn't have to know anything about the
-      # internal mechanics of containers etc
       results = predictions.schedule_job(
           job_id, job.manifest_url, job.run_opts)
       job.id = results['submitted_job_id']
