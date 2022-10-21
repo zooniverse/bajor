@@ -12,6 +12,27 @@ import pytorch_lightning as pl
 from zoobot.shared import save_predictions
 from pytorch_galaxy_datasets import galaxy_datamodule, galaxy_dataset
 
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# add retries on requests if we have flaky networks
+# https://www.peterbe.com/plog/best-practice-with-retries-with-requests
+def requests_retry_session(retries=3, backoff_factor=0.3):
+    session = requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        # use the following to force a retry on the response status codes
+        # status_forcelist=(104, 400, 404, 500, 502, 504)
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    # should only have https scheme but let's be safe here
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
 # # override the get_galaxy_label package function for use in the prediction data loaders
 # # essentially we don't need the labels in the prediction catalogues
 # def predict_get_galaxy_label(galaxy, label_cols):
@@ -31,13 +52,20 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           # Note: the model must be trained on similar image formats
           #
           # streaming the file as it is used (saves on memory)
-          r = requests.get(url, stream=True)
-          decoded_jpeg = galaxy_dataset.decode_jpeg(r.raw.read())
+          logging.debug('Downloading url: {}'.format(url))
+          response = requests_retry_session().get(url, stream=True)
+          # ensure we raise other response errors like 404 and 500 etc
+          # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
+          response.raise_for_status()
+          decoded_jpeg = galaxy_dataset.decode_jpeg(response.raw.read())
           # HWC PIL image via simplejpeg
           image = Image.fromarray(decoded_jpeg)
       except Exception as e:
-          logging.critical('Cannot load {}'.format(galaxy['image_url']))
+          # add some logging on the failed url
+          logging.critical('Cannot load {}'.format(url))
+          # and make sure we reraise the error
           raise e
+
       # avoid the label lookups as they aren't used in the prediction
       label = []
 
