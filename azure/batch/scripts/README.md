@@ -1,6 +1,6 @@
 # How are these files used
 
-These files are stored in SCM here but are also stored in the batch blob storage system in the 'training' & 'predictions' containers under the `/code` path prefix.
+These files are stored in SCM here but are also stored in the batch blob storage system in the 'training' & 'predictions' containers under the `/code` path prefix. These files are automatically synced to the above locations via a Github Action (see deploy_batch_scipts.yml).
 
 These files are then injected to each Zoobot batch job run at runtime before calling the relevant script.
 
