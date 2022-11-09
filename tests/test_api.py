@@ -27,7 +27,7 @@ def mocked_client():
 def test_read_api(mocked_client):
     response = mocked_client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"revision": fake_revision}
+    assert response.json() == { "revision": fake_revision, "autodocs": { "redoc": "http://testserver/redoc", "swagger": "http://testserver/docs" }}
 
 def test_manifest_job_creation_without_auth_creds(mocked_client):
     response = mocked_client.post(
