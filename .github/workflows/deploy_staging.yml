@@ -48,7 +48,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_STORAGE_KEY }}
+        creds: ${{ secrets.AZURE_STATIC_SITES }}
     - name: Upload scripts to blob storage
       uses: azure/CLI@v1
       with:
