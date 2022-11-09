@@ -12,6 +12,7 @@ services:
     env_file:
       - env.list
     environment:
+      - TRAINING_RUN_OPTS=--debug
       - DEBUG=true
       - LOG_LEVEL=DEBUG
       - MANIFEST_PATH=training_catalogues/workflow-3598-2022-06-24T14:18:16+00:00.csv
