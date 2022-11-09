@@ -1,0 +1,48 @@
+name: Deploy Batch Scripts to Azure Storage
+
+on:
+  workflow_run:
+    workflows: [Run tests]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy_batch_scripts:
+    name: Deploy Batch scripts to Azure Storage
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_STATIC_SITES }}
+    - name: Upload scripts to blob storage
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'training' \
+            --overwrite true \
+            --name 'code/train_model_on_catalog.py' \
+            --file './azure/batch/scripts/train_model_on_catalog.py'
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'training' \
+            --overwrite true \
+            --name 'code/promote_best_checkpoint_to_model.sh' \
+            --file './azure/batch/scripts/promote_best_checkpoint_to_model.sh'
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'predictions' \
+            --overwrite true \
+            --name 'code/predict_on_catalog.py' \
+            --file './azure/batch/scripts/predict_on_catalog.py'
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'predictions' \
+            --overwrite true \
+            --name 'code/predict_catalog_with_model.py' \
+            --file './azure/batch/scripts/predict_catalog_with_model.py'
