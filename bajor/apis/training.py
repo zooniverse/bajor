@@ -9,6 +9,8 @@ from bajor.apis.basic_auth import validate_basic_auth
 import bajor.batch.training as training
 import bajor.batch.jobs as batch_jobs
 
+from bajor.env_helpers import training_run_opts
+
 if os.getenv('DEBUG'):
   import pdb
 
@@ -35,7 +37,10 @@ async def create_job(job: TrainingJob, response: Response, authorized: bool = De
     else:
       log.debug('No active jobs running - lets get scheduling!')
 
-      results = training.schedule_job(job_id, job.stripped_manifest_path(), job.run_opts)
+      # allow the env to specify default run opts like --debug on staging
+      run_opts = f'{job.run_opts()} {training_run_opts()}'
+
+      results = training.schedule_job(job_id, job.stripped_manifest_path(), run_opts)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 

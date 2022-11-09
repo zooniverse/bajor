@@ -22,3 +22,6 @@ def max_num_pool_nodes(pool_id):
         return os.environ.get('MAX_NODES_PREDICTION', 2)
     else:
         return 0
+
+def training_run_opts():
+    return os.environ.get('TRAINING_RUN_OPTS', '')

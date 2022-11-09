@@ -48,6 +48,8 @@ spec:
             value: '80'
           - name: LOG_LEVEL
             value: 'DEBUG'
+          - name: TRAINING_RUN_OPTS
+            value: '--debug'
           envFrom:
           - secretRef:
               name: bajor-common-env-vars
