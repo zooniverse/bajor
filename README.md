@@ -6,6 +6,15 @@ The Zooniverse API for scheduling Azure batch jobs for machine learning systems.
 
 Linked to the work in https://github.com/zooniverse/kade
 
+## Documentation
+
+### Training API docs
+
+- [Swagger Format](https://bajor.zooniverse.org/docs)
+- [Redoc Format](https://bajor.zooniverse.org/redoc)
+- [OpenAPI JSON Format](https://bajor.zooniverse.org/openapi.json)
+
+
 ## Requirements
 
 BaJoR uses Docker to manage its environment, the requirements listed below are also found in `docker-compose.yml`. The means by which a new instance is created with Docker is located in the `Dockerfile`. If you plan on using Docker to manage this application, skip ahead to Installation.
