@@ -1,27 +1,45 @@
 import uvicorn
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from honeybadger import contrib
+
 from bajor.env_helpers import revision, host, port
-from bajor.apis.training import training_app
-from bajor.apis.predictions import predictions_app
+from bajor.apis.training import router as training_router
+from bajor.apis.predictions import router as predictions_router
+
 
 if os.getenv('DEBUG'):
   import pdb
 
+class ApiInfo(object):
+    def __init__(
+        self,
+        app: FastAPI,
+        request: Request):
+
+        super(ApiInfo, self).__init__()
+
+        self.autodocs = {
+            'swagger': str(request.url) + app.docs_url.strip("/"),
+            'redoc': str(request.url) + app.redoc_url.strip("/"),
+        }
+
+        self.revision = revision()
+
 app = FastAPI()
-# configure HB through the env vars https://docs.honeybadger.io/lib/python/#configuration
 app.add_middleware(contrib.ASGIHoneybadger)
 
 # Main app end points (also a health check)
 @app.get("/")
-async def root():
-    return {"revision": revision()}
+async def root(request: Request):
+    apiInfo = ApiInfo(app, request)
 
-# SubAPIs
-# mount the subapi's at path prefixes
-app.mount("/training", training_app)
-app.mount("/prediction", predictions_app)
+    return apiInfo.__dict__
+
+# mount the modules at their router path prefixes
+app.include_router(training_router)
+app.include_router(predictions_router)
+
 
 def start_app(reload=False):
     uvicorn.run(

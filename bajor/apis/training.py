@@ -1,6 +1,6 @@
 import os
 
-from fastapi import Depends, FastAPI, HTTPException, status, Response
+from fastapi import Depends, APIRouter, HTTPException, status, Response
 
 from bajor.models.job import TrainingJob
 from bajor.log_config import log
@@ -14,11 +14,13 @@ from bajor.env_helpers import training_run_opts
 if os.getenv('DEBUG'):
   import pdb
 
-# SubAPI for training jobs on /training path
-# https://fastapi.tiangolo.com/advanced/sub-applications/
-training_app = FastAPI()
+# router prefix for training jobs api
+# https://fastapi.tiangolo.com/tutorial/bigger-applications/#import-apirouter
+router = APIRouter(
+    prefix="/training",
+)
 
-@training_app.post("/jobs/", status_code=status.HTTP_201_CREATED)
+@router.post("/jobs/", status_code=status.HTTP_201_CREATED)
 async def create_job(job: TrainingJob, response: Response, authorized: bool = Depends(validate_basic_auth)) -> TrainingJob:
     if not authorized:
       raise HTTPException(
@@ -47,7 +49,7 @@ async def create_job(job: TrainingJob, response: Response, authorized: bool = De
       return job
 
 
-@training_app.get("/jobs/", status_code=status.HTTP_200_OK)
+@router.get("/jobs/", status_code=status.HTTP_200_OK)
 async def list_jobs(response: Response, active: bool = True, authorized: bool = Depends(validate_basic_auth)):
     if not authorized:
       raise HTTPException(
@@ -60,7 +62,7 @@ async def list_jobs(response: Response, active: bool = True, authorized: bool = 
     return training.get_active_batch_job_list() if active else training.get_non_active_batch_job_list()
 
 
-@training_app.get("/job/{job_id}", status_code=status.HTTP_200_OK)
+@router.get("/job/{job_id}", status_code=status.HTTP_200_OK)
 async def get_job_by_id(job_id: str, response: Response, include_tasks: bool = True, authorized: bool = Depends(validate_basic_auth)):
     if not authorized:
       raise HTTPException(
