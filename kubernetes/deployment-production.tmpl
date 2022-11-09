@@ -1,0 +1,93 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bajor-production-app
+  labels:
+    app: bajor-production-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bajor-production-app
+  template:
+    metadata:
+      labels:
+        app: bajor-production-app
+    spec:
+      containers:
+        - name: bajor-production-app
+          image: ghcr.io/zooniverse/bajor:__IMAGE_TAG__
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "100m"
+            limits:
+              memory: "1000Mi"
+              cpu: "1000m"
+          startupProbe:
+            httpGet:
+              path: /
+              port: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            # allow a longer response time than 1s
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            # allow a longer response time than 1s
+            timeoutSeconds: 10
+          env:
+          - name: HONEYBADGER_ENVIRONMENT
+            value: 'production'
+          - name: PORT
+            value: '80'
+          - name: LOG_LEVEL
+            value: 'INFO'
+          envFrom:
+          - secretRef:
+              name: bajor-common-env-vars
+          - secretRef:
+              name: bajor-production-api-env-vars
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bajor-production-app
+spec:
+  selector:
+    app: bajor-production-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bajor-production-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+spec:
+  tls:
+  - hosts:
+    - bajor.zooniverse.org
+    secretName: zooniverse-org-tls
+  rules:
+  - host: bajor.zooniverse.org
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: bajor-production-app
+            port:
+              number: 80
