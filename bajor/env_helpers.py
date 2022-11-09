@@ -6,10 +6,6 @@ def api_basic_username():
 def api_basic_password():
     return os.environ.get('BASIC_AUTH_PASSWORD', 'bajor')
 
-def api_job_complete_url(job_id):
-    bajor_url = os.environ.get('JOB_COMPLETE_URL', 'https://bajor-staging.zooniverse.org')
-    return f'{bajor_url}/job/{job_id}'
-
 def revision():
     return os.environ.get('REVISION')
 
