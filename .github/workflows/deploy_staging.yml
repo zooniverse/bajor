@@ -42,12 +42,13 @@ jobs:
 
   deploy_batch_scripts:
     name: Deploy Batch scripts to Staging
+    needs: deploy_staging
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - uses: azure/login@v1
       with:
-        creds: ${{ secrets.creds }}
+        creds: ${{ secrets.AZURE_STATIC_SITES }}
     - name: Upload scripts to blob storage
       uses: azure/CLI@v1
       with:
