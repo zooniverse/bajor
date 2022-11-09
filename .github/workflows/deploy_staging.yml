@@ -81,7 +81,7 @@ jobs:
   slack_notification:
     name: Slack notification
     uses: zooniverse/ci-cd/.github/workflows/slack_notification.yaml@main
-    needs: deploy_staging
+    needs: deploy_batch_scripts
     if: always()
     with:
       commit_id: ${{ github.sha }}
