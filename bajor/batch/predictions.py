@@ -48,7 +48,7 @@ def create_batch_job(job_id, manifest_url, pool_id):
                 value=os.getenv('CODE_DIR_PATH', 'code')),
             # specify the place we have setup the blob storage container to mount to
             # this is linked to how we built the batch system, see the batch system setup code in
-            # https://github.com/zooniverse/panoptes-python-notebook/blob/master/examples/create_batch_pool_zoobot_staging.ipynb
+            # https://github.com/zooniverse/bajor/tree/main/azure/batch#create-a-azure-batch-compute-nodepool
             batchmodels.EnvironmentSetting(
                 name='PREDICTIONS_CONTAINER_MOUNT_DIR',
                 value='predictions'),
