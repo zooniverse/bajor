@@ -12,7 +12,7 @@ This image depends on the upstream Zoobot project <https://github.com/mwalmsley/
 # build the image for use
 docker-compose build
 # run a bash console in the dev container
-docker compose run --service-ports --rm zoobot
+docker compose run --service-ports --rm zoobot bash
 # do your dev work and test it!
 
 # e.g. test your training system is working
