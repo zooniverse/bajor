@@ -53,13 +53,20 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           #
           # streaming the file as it is used (saves on memory)
           logging.debug('Downloading url: {}'.format(url))
+          # use retries on requests if we have flaky networks
           response = requests_retry_session().get(url, stream=True)
           # ensure we raise other response errors like 404 and 500 etc
           # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
           response.raise_for_status()
-          decoded_jpeg = galaxy_dataset.decode_jpeg(response.raw.read())
-          # HWC PIL image via simplejpeg
-          image = Image.fromarray(decoded_jpeg)
+          url_mime_type = response.headers['content-type']
+          # handle PNG images
+          if url_mime_type == 'image/png':
+              # use PIL image to read the png file buffer
+              image = Image.open(response.raw)
+          else: # but assume all other images are JPEG
+              # HWC PIL image
+              image = Image.fromarray(
+                  galaxy_dataset.decode_jpeg(response.raw.read()))
       except Exception as e:
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
