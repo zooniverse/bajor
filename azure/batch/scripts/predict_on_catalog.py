@@ -4,13 +4,15 @@ import datetime
 from typing import List, Optional
 from PIL import Image
 
+import numpy as np
 import pandas as pd
 import requests
 import torch
 import pytorch_lightning as pl
 
 from zoobot.shared import save_predictions
-from pytorch_galaxy_datasets import galaxy_datamodule, galaxy_dataset
+# TODO these imports will work once galaxy_datasets PR merged
+from galaxy_datasets.pytorch import galaxy_datamodule, galaxy_dataset
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -158,3 +160,87 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     end = datetime.datetime.fromtimestamp(time.time())
     logging.info('Completed at: {}'.format(end.strftime('%Y-%m-%d %H:%M:%S')))
     logging.info('Time elapsed: {}'.format(end - start))
+
+
+def predictions_to_expectation_of_answer(predictions: np.ndarray, question_indices: List[int], answer_index: int) -> np.ndarray:
+    """
+    Calculate expected vote fraction for some answer, from Zoobot dirichlet predictions
+
+    https://en.wikipedia.org/wiki/Dirichlet_distribution
+    See properties, moments, E[Xi]
+
+    Args:
+        predictions (np.ndarray): Dirichlet concentrations of shape (n_galaxies, n_answers)
+        question_indices (List[int]): Start and end column index of the question's answers (e.g. [0, 2] for smooth or featured)
+        answer_index (int): Column index of the answer (e.g. 0 for smooth)
+
+    Returns:
+        np.ndarray: expected value of Dirichlet variable for that answer (i.e. the fraction of volunteers giving that answer), shape (n_galaxies)
+    """
+
+    # could do in one line but might as well be explicit/clear
+    alpha_all = predictions[:, question_indices[0]:question_indices[1]+1].sum(axis=1)
+    alpha_i = predictions[:, answer_index]
+    return alpha_i / alpha_all
+
+
+def predictions_to_variance_of_answer(predictions: np.ndarray,  question_indices: List[int], answer_index: int) -> np.ndarray:
+    """
+    Calculate variance (uncertainty) on vote fraction for some answer, from Zoobot dirichlet predictions
+
+    https://en.wikipedia.org/wiki/Dirichlet_distribution
+    See properties, moments, Var[Xi]
+
+    Args:
+        predictions (np.ndarray): Dirichlet concentrations of shape (n_galaxies, n_answers)
+        question_indices (List[int]): Start and end column index of the question's answers (e.g. [0, 2] for smooth or featured)
+        answer_index (int): Column index of the answer (e.g. 0 for smooth)
+
+    Returns:
+        np.ndarray: Variance (uncertainty) of Dirichlet variable for that answer (i.e. the variance on the fraction of volunteers giving that answer), shape (n_galaxies)
+    """
+    alpha_all = predictions[:, question_indices[0]:question_indices[1]+1].sum(axis=1)
+    alpha_i = predictions[:, answer_index]
+    return alpha_i * (alpha_all - alpha_i) / (alpha_all**2 * (alpha_all + 1))
+
+
+def test_predictions_to_expectation_of_answer():
+
+    predictions = np.array([[8., 2., 1.5], [4., 5., 1.5]])
+
+    smooth_or_featured_start_and_end_indices = [0, 2]
+    smooth_or_featured_smooth_index = 0
+
+    expectations = predictions_to_expectation_of_answer(
+        predictions,
+        smooth_or_featured_start_and_end_indices,
+        smooth_or_featured_smooth_index
+    )
+
+    # first row should have higher expectation than second
+    # assert np.allclose(expectations, [0.69565217, 0.38095238])
+    print('Expectations: ', expectations)
+
+
+def test_predictions_to_variance_of_answer():
+
+    predictions = np.array([[8., 2., 1.5], [4., 5., 1.5]])
+
+    smooth_or_featured_start_and_end_indices = [0, 2]
+    smooth_or_featured_smooth_index = 0
+
+    variances = predictions_to_variance_of_answer(
+        predictions,
+        smooth_or_featured_start_and_end_indices,
+        smooth_or_featured_smooth_index
+    )
+    # first row should have smaller variance than second
+    # assert np.allclose(variances, [0.01693762, 0.02050675])
+    print('Variances: ', variances)
+
+
+# TODO feel free to remove or make proper test
+if __name__ == '__main__':
+
+    test_predictions_to_expectation_of_answer()
+    test_predictions_to_variance_of_answer()
