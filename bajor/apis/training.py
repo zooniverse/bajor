@@ -6,7 +6,7 @@ from bajor.models.job import TrainingJob
 from bajor.log_config import log
 from bajor.apis.basic_auth import validate_basic_auth
 
-import bajor.batch.training as training
+import bajor.batch.train_finetuning as training
 import bajor.batch.jobs as batch_jobs
 
 from bajor.env_helpers import training_run_opts
