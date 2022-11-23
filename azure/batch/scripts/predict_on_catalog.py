@@ -98,7 +98,7 @@ class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
         self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.transform)
 
 
-def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, save_loc: str, datamodule_kwargs, trainer_kwargs):
+def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
     # extract the uniq image identifiers
     image_id_strs = list(catalog['subject_id'])
 

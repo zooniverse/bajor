@@ -70,6 +70,7 @@ if __name__ == '__main__':
         catalog=catalog,
         save_loc=args.save_loc,
         n_samples=args.num_samples,
+        label_cols=label_metadata.cosmic_dawn_ortho_label_cols,
         datamodule_kwargs=datamodule_args,
         trainer_kwargs=trainer_args
     )
