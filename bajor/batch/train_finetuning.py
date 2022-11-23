@@ -189,7 +189,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # train_cmd file path is copied from blob storage into this runtime container
     # so this location is relative to the container paths and can be modified at runtime
     # see jobPreparation task for code setup
-    train_code_path = os.getenv('ZOOBOT_FINETUNE_TRAIN_CMD', 'train_model_finetune_catalog.py')
+    train_code_path = os.getenv('ZOOBOT_FINETUNE_TRAIN_CMD', 'train_model_finetune_on_catalog.py')
     # checkpoint file is the base model for finetuning (transfer learning)
     checkpoint_file = os.getenv('ZOOBOT_FINETUNE_CHECKPOINT_FILE', 'zoobot_decals_5_greyscale_model.ckpt')
     # setup the training cmd
