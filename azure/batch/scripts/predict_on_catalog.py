@@ -229,8 +229,7 @@ def test_predictions_to_variance_of_answer():
     print('Variances: ', variances)
 
 
-# TODO feel free to remove or make proper test
 if __name__ == '__main__':
-
+    # run the tests for the prediction metric functions
     test_predictions_to_expectation_of_answer()
     test_predictions_to_variance_of_answer()
