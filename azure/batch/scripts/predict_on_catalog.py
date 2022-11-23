@@ -3,6 +3,7 @@ import time
 import datetime
 from typing import List, Optional
 from PIL import Image
+import json
 
 import numpy as np
 import pandas as pd
@@ -98,6 +99,35 @@ class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
         self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.transform)
 
 
+def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
+    # JSON output format is used for services like the zooniverse subject assistant
+    assert save_loc.endswith('.json')
+    # setup the output data structur with a schema describing the data
+    output_data = {
+      'schema': {
+        'version': 1,
+        'type': 'zooniverse/subject_assistant',
+        'data': { 'subject_id': [['variance_of_prediction'], ['expectation_galaxy_is_smooth']] }
+      }
+    }
+    # only derive each galaxies smooth or features question right now for simplicity of metric
+    # i.e. we're trying to figure out if this galaxy is interesting or not for human volunteers
+    # if it's smooth it's not interesting so we can use this metric to decide to show it to volunteers
+    smooth_or_featured_start_and_end_indices = [0, 2]
+    # the smooth answer label index
+    smooth_or_featured_smooth_index = 0
+    variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
+    expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
+    prediction_data = {}
+    for n in range(len(predictions)):
+        prediction_data[id_str[n]] = [
+            variances[n].tolist(), expectations[n].tolist()]
+    # add the prediction data to the output data dict
+    output_data['data'] = prediction_data
+    with open(save_loc, 'w') as out_file:
+        json.dump(output_data, out_file)
+
+
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
     # extract the uniq image identifiers
     image_id_strs = list(catalog['subject_id'])
@@ -140,7 +170,8 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     elif save_loc.endswith('.hdf5'):
         save_predictions.predictions_to_hdf5(predictions, image_id_strs, label_cols, save_loc)
     elif save_loc.endswith('.json'):
-        save_predictions.predictions_to_json(predictions, image_id_strs, label_cols, save_loc)
+        # contribut this upstream to zoobot
+        save_predictions_to_json(predictions, image_id_strs, label_cols, save_loc)
     else:
         logging.warning('Save format of {} not recognised - assuming csv'.format(save_loc))
         save_predictions.predictions_to_csv(predictions, image_id_strs, label_cols, save_loc)
