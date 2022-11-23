@@ -15,8 +15,8 @@ docker-compose build
 docker compose run --service-ports --rm zoobot bash
 # do your dev work and test it!
 
-# e.g. test your training system is working
- python scripts/train_model_on_catalog.py --experiment-dir data/ --resize-size 32 --epochs 3 --batch-size 3 --accelerator cpu --gpus 0 --num-workers 2 --skip-mission-catalog --debug --catalog data/training_catalogues/workflow-3598-2022-05-cam-test.csv
+# e.g. test your finetuning training system is working
+ python scripts/train_model_finetune_on_catalog.py.py --experiment-dir data/ --resize-size 32 --epochs 3 --batch-size 3 --accelerator cpu --gpus 0 --num-workers 2 --skip-mission-catalog --debug --catalog data/training_catalogues/workflow-3598-2022-05-cam-test.csv
 
 # or test a prediction system
  python scripts/predict_catalog_with_model.py --checkpoint-path data/pretrained_models/pytorch/zoobot.ckpt --catalog-url https://raw.githubusercontent.com/camallen/files-o-matic/main/hamlet-manifests/hamlet-subject-assistant-example-manifest.json --save-path data/results/predictions_results.csv --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
@@ -100,6 +100,6 @@ Now we have the Azure batch system setup to run code we can show how we use BaJo
 
 As specified in <https://github.com/zooniverse/bajor/blob/8567ebeb895c3d431f86a89bddbe6732e6afbf73/bajor/batch.py#L197-L200> we allow the nodepool id to be set when we submit the batch job for processing.
 
-Finally we tell the Zoobot (ML system) code what to do via the job's task command specified at <https://github.com/zooniverse/bajor/blob/8567ebeb895c3d431f86a89bddbe6732e6afbf73/bajor/batch.py#L143>. Here we tell it to run the `train_model_on_catalog.py` code to train Zoobot but again this is configurable as required (either via the API or via a controlled list of operations we want to perform TBC).
+Finally we tell the Zoobot (ML system) code what to do via the job's task command specified at <https://github.com/zooniverse/bajor/blob/8567ebeb895c3d431f86a89bddbe6732e6afbf73/bajor/batch.py#L143>. Here we tell it to run the `train_model_finetune_on_catalog.py` code to train Zoobot but again this is configurable as required (either via the API or via a controlled list of operations we want to perform TBC).
 
 **longer term we can extract to the API for configuration on each request TBC.

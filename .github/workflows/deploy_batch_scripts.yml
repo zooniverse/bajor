@@ -26,8 +26,14 @@ jobs:
             --account-name kadeactivelearning \
             --container-name 'training' \
             --overwrite true \
-            --name 'code/train_model_on_catalog.py' \
-            --file './azure/batch/scripts/train_model_on_catalog.py'
+            --name 'code/train_model_from_scratch_on_catalog.py' \
+            --file './azure/batch/scripts/train_model_from_scratch_on_catalog.py'
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'training' \
+            --overwrite true \
+            --name 'code/train_model_finetune_on_catalog.py' \
+            --file './azure/batch/scripts/train_model_finetune_on_catalog.py'
           az storage blob upload \
             --account-name kadeactivelearning \
             --container-name 'training' \
