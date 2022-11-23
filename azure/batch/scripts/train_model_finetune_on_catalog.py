@@ -51,6 +51,7 @@ if __name__ == '__main__':
     kade_catalog = pd.read_csv(args.catalog_loc)
 
     if args.debug:
+        logging.debug('Using --debug mode')
         # add debugging steps here.. like data cleaning, reshaping etc
         # kade_catalog['id_str'] = kade_catalog['id_str'].astype(str)
         # kade_catalog = kade_catalog.rename(columns={'problem_non-star': 'problem_artifact'})
