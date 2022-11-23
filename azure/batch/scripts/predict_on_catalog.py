@@ -11,7 +11,6 @@ import torch
 import pytorch_lightning as pl
 
 from zoobot.shared import save_predictions
-# TODO these imports will work once galaxy_datasets PR merged
 from galaxy_datasets.pytorch import galaxy_datamodule, galaxy_dataset
 
 from requests.adapters import HTTPAdapter
@@ -35,15 +34,17 @@ def requests_retry_session(retries=3, backoff_factor=0.3):
     session.mount('https://', adapter)
     return session
 
-# # override the get_galaxy_label package function for use in the prediction data loaders
-# # essentially we don't need the labels in the prediction catalogues
-# def predict_get_galaxy_label(galaxy, label_cols):
-#     return []
-
-# galaxy_dataset.get_galaxy_label = predict_get_galaxy_label
-
 
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
+  # override the default class implementation for predictions that download from URL
+  def __init__(self, catalog: pd.DataFrame, label_cols=None, transform=None, target_transform=None):
+      self.catalog = catalog
+
+      self.label_cols = label_cols
+      self.transform = transform
+      self.target_transform = target_transform
+
+
   def __getitem__(self, idx):
       galaxy = self.catalog.iloc[idx]
       # load the data from the remote image URL
@@ -88,39 +89,28 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           label = self.target_transform(label)
 
       # logging.info((image.shape, torch.max(image), image.dtype, label))  #  should be 0-1 float
-      return image, label
+      return image
 
 
 class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
+    # override the setup method to setup our prediction dataset on the prediction catalog
     def setup(self, stage: Optional[str] = None):
-        super().setup(stage)
-
-        self.predict_dataset = PredictionGalaxyDataset(
-            catalog=self.predict_catalog, label_cols=self.label_cols, transform=self.transform
-        )
+        self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.transform)
 
 
-def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
+def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, save_loc: str, datamodule_kwargs, trainer_kwargs):
     # extract the uniq image identifiers
     image_id_strs = list(catalog['subject_id'])
 
     predict_datamodule = PredictionGalaxyDataModule(
-        label_cols=label_cols,
+        label_cols=None, # we don't need the labels for predictions
         predict_catalog=catalog,  # no need to specify the other catalogs
         # will use the default transforms unless overridden with datamodule_kwargs
         #
         **datamodule_kwargs  # e.g. batch_size, resize_size, crop_scale_bounds, etc.
     )
 
-    # predict_datamodule = galaxy_datamodule.GalaxyDataModule(
-    #     label_cols=label_cols,
-    #     predict_catalog=catalog,  # no need to specify the other catalogs
-    #     # will use the default transforms unless overridden with datamodule_kwargs
-    #     #
-    #     **datamodule_kwargs  # e.g. batch_size, resize_size, crop_scale_bounds, etc.
-    # )
-    # with this stage arg, will only use predict_catalog
-    # crucial to specify the stage, or will error (as missing other catalogs)
+    # setup the preduction catalog - specify the stage, or will error (as missing other catalogs)
     predict_datamodule.setup(stage='predict')
 
     # set up trainer (again)
@@ -128,8 +118,6 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
         max_epochs=-1,  # does nothing in this context, suppresses warning
         **trainer_kwargs  # e.g. gpus
     )
-
-    # from here, very similar to tensorflow version - could potentially refactor
 
     logging.info('Beginning predictions')
     start = datetime.datetime.fromtimestamp(time.time())
@@ -151,6 +139,8 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
         save_predictions.predictions_to_csv(predictions, image_id_strs, label_cols, save_loc)
     elif save_loc.endswith('.hdf5'):
         save_predictions.predictions_to_hdf5(predictions, image_id_strs, label_cols, save_loc)
+    elif save_loc.endswith('.json'):
+        save_predictions.predictions_to_json(predictions, image_id_strs, label_cols, save_loc)
     else:
         logging.warning('Save format of {} not recognised - assuming csv'.format(save_loc))
         save_predictions.predictions_to_csv(predictions, image_id_strs, label_cols, save_loc)

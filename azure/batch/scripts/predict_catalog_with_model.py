@@ -16,17 +16,6 @@ def load_model_from_checkpoint(checkpoint_path):
 
     return define_model.ZoobotLightningModule.load_from_checkpoint(checkpoint_path)
 
-def label_cols_from_metadata():
-    # setup decals 5 & 8 labels
-    question_answer_pairs = {}
-    question_answer_pairs.update(label_metadata.decals_dr5_ortho_pairs)
-    question_answer_pairs.update(label_metadata.decals_dr8_ortho_pairs)
-    # long term predict on all available decals data columns (dr12, dr5, dr8 etc)
-    # question_answer_pairs = label_metadata.decals_all_campaigns_ortho_pairs
-    _decals_questions, decals_label_cols = label_metadata.extract_questions_and_label_cols(
-        question_answer_pairs)
-    return decals_label_cols
-
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.INFO,
@@ -34,9 +23,9 @@ if __name__ == '__main__':
     )
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--checkpoint-path', dest='checkpoint_path', type=str)
-    parser.add_argument('--save-path', dest='save_loc', type=str)
-    parser.add_argument('--catalog-url', dest='catalog_url', type=str)
+    parser.add_argument('--checkpoint-path', dest='checkpoint_path', type=str, required=True)
+    parser.add_argument('--save-path', dest='save_loc', type=str, required=True)
+    parser.add_argument('--catalog-url', dest='catalog_url', type=str, required=True)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=1)
     parser.add_argument('--num-workers', dest='num_workers', type=int, default=11)  # benchmarks show 11 work on our VM types - was int((os.cpu_count())
     parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=9)  # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
@@ -81,7 +70,6 @@ if __name__ == '__main__':
         catalog=catalog,
         save_loc=args.save_loc,
         n_samples=args.num_samples,
-        label_cols=label_cols_from_metadata(),
         datamodule_kwargs=datamodule_args,
         trainer_kwargs=trainer_args
     )
