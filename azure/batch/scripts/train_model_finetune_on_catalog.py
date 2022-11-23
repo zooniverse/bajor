@@ -81,8 +81,7 @@ if __name__ == '__main__':
         },
         'trainer': {
             'devices': args.devices,
-            'accelerator': args.accelerator,
-            'gpus': args.gpus  # per node
+            'accelerator': args.accelerator
         },
         'finetune': {
             'encoder_dim': args.encoder_dim,
