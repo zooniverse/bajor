@@ -51,8 +51,10 @@ if __name__ == '__main__':
     kade_catalog = pd.read_csv(args.catalog_loc)
 
     if args.debug:
-        # add debugging steps here.. like data cleaning etc
-        kade_catalog['id_str'] = kade_catalog['id_str'].astype(str)
+        # add debugging steps here.. like data cleaning, reshaping etc
+        # kade_catalog['id_str'] = kade_catalog['id_str'].astype(str)
+        # kade_catalog = kade_catalog.rename(columns={'problem_non-star': 'problem_artifact'})
+        # kade_catalog['file_loc'].str.replace('/local/paths/to/catalog/images', '/mnt/batch/tasks/fsmounts/training/catalogues/production/images')
 
     # print the first and last file loc of the loaded catalog
     logging.info('Catalog has {} rows'.format(len(kade_catalog.index)))
