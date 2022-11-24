@@ -111,9 +111,9 @@ if __name__ == '__main__':
     # derive the checkpoint and model results here for possible use later
     # e.g. like in a prediction system etc
     # however our setup will save the
-    checkpoint, _model = finetune.run_finetuning(
+    checkpoint_path, _model = finetune.run_finetuning(
         config, encoder, datamodule, save_dir=args.save_dir, logger=None
     )
 
     logging.info(
-        f'Finished training on catalog - checkpoint save to: {checkpoint.best_model_path}')
+        f'Finished training on catalog - checkpoint save to: {checkpoint_path}')
