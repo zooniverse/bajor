@@ -26,8 +26,10 @@ def requests_retry_session(retries=3, backoff_factor=0.3):
         read=retries,
         connect=retries,
         backoff_factor=backoff_factor,
-        # use the following to force a retry on the response status codes
-        # status_forcelist=(104, 400, 404, 500, 502, 504)
+        # use the following to force a retry on the following HTTP response status codes
+        # https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
+        # server error or connection problems to the origin server
+        status_forcelist=(104, 429, 500, 502, 503, 504)
     )
     adapter = HTTPAdapter(max_retries=retry)
     # should only have https scheme but let's be safe here
