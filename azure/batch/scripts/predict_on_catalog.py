@@ -7,6 +7,7 @@ import json
 
 import numpy as np
 import pandas as pd
+from scipy.stats import beta  # possible new dependency, Cam
 import requests
 import torch
 import pytorch_lightning as pl
@@ -241,8 +242,8 @@ def test_predictions_to_expectation_of_answer():
     )
 
     # first row should have higher expectation than second
-    # assert np.allclose(expectations, [0.69565217, 0.38095238])
-    print('Expectations: ', expectations)
+    assert np.allclose(expectations, [0.69565217, 0.38095238])
+    # print('Expectations: ', expectations)
 
 
 def test_predictions_to_variance_of_answer():
@@ -258,11 +259,63 @@ def test_predictions_to_variance_of_answer():
         smooth_or_featured_smooth_index
     )
     # first row should have smaller variance than second
-    # assert np.allclose(variances, [0.01693762, 0.02050675])
-    print('Variances: ', variances)
+    assert np.allclose(variances, [0.01693762, 0.02050675])
+    # print('Variances: ', variances)
+
+
+def odds_answer_below_bounds(predictions: np.ndarray,  question_indices: List[int], answer_index: int, bound) -> np.ndarray:
+    """
+    Calculate the predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound'
+    (for a given question and answer) 
+    e.g. the predicted odds that an infinite number of volunteers would answer `smooth' to `smooth or featured' less than 20% of the time
+
+    (If you want the odds above bounds, just do 1 - this)
+
+    ("predicted infinite-volunteer vote fraction" is the intuitive way to say "the value drawn from the dirichlet distribution")
+
+    Args:
+        predictions (np.ndarray): Dirichlet concentrations of shape (n_galaxies, n_answers)
+        question_indices (List[int]): Start and end column index of the question's answers (e.g. [0, 2] for smooth or featured)
+        answer_index (int): Column index of the answer (e.g. 0 for smooth)
+        bound (float, optional): highest allowed infinite-volunter vote fraction. Defaults to 0.2.
+
+    Returns:
+        np.ndarray: predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound', shape (batch)
+    """
+    concentrations_q = predictions[:, question_indices[0]:question_indices[1]+1]
+    concentrations_a = predictions[:, answer_index]
+    # dirichlet of this or not this is equivalent to beta distribution with concentrations (this, sum_of_not_this)
+    concentrations_not_a = concentrations_q.sum(axis=1) - concentrations_a
+    # concentrations_a and concentrations_not_a have shape (batch)
+    return beta(a=concentrations_a, b=concentrations_not_a).cdf(bound)  # will broadcast
+
+    # NB: we can actually test this
+    # samples_of_a = beta(a=concentrations_a, b=concentrations_not_a).rvs((1000, len(predictions)))  # will broadcast
+    # print(np.mean(samples_of_a < bound, axis=0))  # should be similar to .cdf(bound) above
+
+
+def test_predictions_to_bounds():
+
+    predictions = np.array([[8., 2., 1.5], [4., 5., 1.5]])
+
+    smooth_or_featured_start_and_end_indices = [0, 2]
+    smooth_or_featured_smooth_index = 0
+
+    odds_below_bound = odds_answer_below_bounds(
+        predictions,
+        smooth_or_featured_start_and_end_indices,
+        smooth_or_featured_smooth_index,
+        bound=0.2
+    )
+    # print(odds_below_bound)
+    # first row should be very likely high ([8., 3.5] concentrations, 2:1 ratio) so odds below 0.2 should be very low
+    # second row should be somewhat likely low ([4, 6.5] concentrations, 2:3 ratio) so odds below 0.2 should be somewhat low
+    assert np.allclose(odds_below_bound, [0.00013951, 0.10257097])
+    # print('CDF: ', variances)
 
 
 if __name__ == '__main__':
     # run the tests for the prediction metric functions
     test_predictions_to_expectation_of_answer()
     test_predictions_to_variance_of_answer()
+    test_predictions_to_bounds()
