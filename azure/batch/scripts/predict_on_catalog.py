@@ -7,7 +7,7 @@ import json
 
 import numpy as np
 import pandas as pd
-from scipy.stats import beta  # possible new dependency, Cam
+from scipy.stats import beta
 import requests
 import torch
 import pytorch_lightning as pl
@@ -266,7 +266,7 @@ def test_predictions_to_variance_of_answer():
 def odds_answer_below_bounds(predictions: np.ndarray,  question_indices: List[int], answer_index: int, bound) -> np.ndarray:
     """
     Calculate the predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound'
-    (for a given question and answer) 
+    (for a given question and answer)
     e.g. the predicted odds that an infinite number of volunteers would answer `smooth' to `smooth or featured' less than 20% of the time
 
     (If you want the odds above bounds, just do 1 - this)
