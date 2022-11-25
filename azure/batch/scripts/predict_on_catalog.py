@@ -110,7 +110,7 @@ def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
       'schema': {
         'version': 1,
         'type': 'zooniverse/subject_assistant',
-        'data': { 'subject_id': [['variance_of_prediction'], ['expectation_galaxy_is_smooth']] }
+        'data': {'subject_id': 'probability_galaxy_is_not_smooth'}
       }
     }
     # only derive each galaxies smooth or features question right now for simplicity of metric
@@ -119,12 +119,18 @@ def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
     smooth_or_featured_start_and_end_indices = [0, 2]
     # the smooth answer label index
     smooth_or_featured_smooth_index = 0
-    variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    prediction_data = {}
-    for n in range(len(predictions)):
-        prediction_data[id_str[n]] = [
-            variances[n].tolist(), expectations[n].tolist()]
+    # lower bound of volunteers answering for a feature, i.e. 20% of volunteers say yes to the feature
+    odds_bound = 0.2
+    #
+    # variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
+    # expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
+    probability_galaxy_is_not_smooth = odds_answer_below_bounds(predictions,
+        smooth_or_featured_start_and_end_indices,
+        smooth_or_featured_smooth_index,
+        odds_bound
+    )
+    # output the probability data as subject_id: percentage probability galaxy is not smooth (i.e. has features / interesting!)
+    prediction_data = {id_str[n]: round((probability_galaxy_is_not_smooth[n][0] * 100.0), 4) for n in range(len(predictions))}
     # add the prediction data to the output data dict
     output_data['data'] = prediction_data
     with open(save_loc, 'w') as out_file:
