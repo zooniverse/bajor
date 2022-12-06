@@ -1,5 +1,4 @@
 import logging
-import os
 import argparse
 
 import pandas as pd
@@ -40,7 +39,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-epochs', dest='num_epochs',
                         default=50, type=int)
     parser.add_argument('--save-top-k', dest='save_top_k', default=1, type=int)
-    parser.add_argument('--patience', default=5, type=int)
+    parser.add_argument('--patience', default=15, type=int)
+    parser.add_argument('--wandb', default=False, action='store_true')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true',
                         help='If true, cut each catalog down to 5k galaxies (for quick training). Should cause overfitting.')
     args = parser.parse_args()
@@ -95,6 +95,22 @@ if __name__ == '__main__':
         }
     }
 
+    if args.wandb:
+        try:
+            import os
+            # wandb needs API keys present as WANDB_API_KEY env var
+            # https://docs.wandb.ai/guides/track/advanced/environment-variables
+            os.environ['WANDB_API_KEY']
+        except KeyError as e:
+            logging.error('WANDB_API_KEY not found in environment variables')
+            # and make sure we reraise the error
+            raise e
+
+        from pytorch_lightning.loggers import WandbLogger
+        logger = WandbLogger(project='finetune', name='zoobot-gz-bajor')
+    else:
+        logger = None
+
     # load the model from checkpoint
     model = define_model.ZoobotLightningModule.load_from_checkpoint(
         args.checkpoint)
@@ -112,7 +128,7 @@ if __name__ == '__main__':
     # e.g. like in a prediction system etc
     # however our setup will save the
     checkpoint_path, _model = finetune.run_finetuning(
-        config, encoder, datamodule, save_dir=args.save_dir, logger=None
+        config, encoder, datamodule, save_dir=args.save_dir, logger=logger
     )
 
     logging.info(
