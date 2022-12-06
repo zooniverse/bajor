@@ -24,3 +24,4 @@ env*.list
 azure/batch/lightning_logs/*
 azure/batch/data/external
 azure/batch/wandb
+azure/batch/zoobot_batch.egg-info
