@@ -101,13 +101,14 @@ if __name__ == '__main__':
             # wandb needs API keys present as WANDB_API_KEY env var
             # https://docs.wandb.ai/guides/track/advanced/environment-variables
             os.environ['WANDB_API_KEY']
+            job_id = os.environ.get('AZ_BATCH_JOB_ID', 'dev-env')
         except KeyError as e:
             logging.error('WANDB_API_KEY not found in environment variables')
             # and make sure we reraise the error
             raise e
 
         from pytorch_lightning.loggers import WandbLogger
-        logger = WandbLogger(project='finetune', name='zoobot-gz-bajor')
+        logger = WandbLogger(project='finetune', name=f'zoobot-bajor-{job_id}')
     else:
         logger = None
 
