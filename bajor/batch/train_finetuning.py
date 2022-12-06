@@ -70,7 +70,11 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # set the training results dir path
             batchmodels.EnvironmentSetting(
                 name='TRAINING_JOB_RESULTS_DIR',
-                value=training_job_results_dir(job_id))
+                value=training_job_results_dir(job_id)),
+            # set the wandb api key
+            batchmodels.EnvironmentSetting(
+                name='WANDB_API_KEY',
+                value=os.getenv('WANDB_API_KEY', '')),
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
