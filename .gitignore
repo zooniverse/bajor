@@ -23,3 +23,4 @@ env*.list
 # ignore the zoobot batch dev/testing env artefacts
 azure/batch/lightning_logs/*
 azure/batch/data/external
+azure/batch/wandb
