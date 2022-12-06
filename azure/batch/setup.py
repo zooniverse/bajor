@@ -20,6 +20,7 @@ setuptools.setup(
     install_requires=[
         # 'zoobot[pytorch] >= 0.0.4', # the big cheese - bring in the zoobot!
         'zoobot[pytorch] @ git+https://github.com/mwalmsley/zoobot.git@dev',
+        'torchmetrics == 0.10.0',
         'requests >= 2.28.1', # used to download prediction images from a remote URL
         'h5py >= 3.7.0' # used for prediction exports
     ]
