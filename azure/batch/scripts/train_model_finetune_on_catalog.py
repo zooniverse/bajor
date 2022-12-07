@@ -102,6 +102,11 @@ if __name__ == '__main__':
             # https://docs.wandb.ai/guides/track/advanced/environment-variables
             os.environ['WANDB_API_KEY']
             job_id = os.environ.get('AZ_BATCH_JOB_ID', 'dev-env')
+            # setup wandb to use the use shared writable dir for config and cache
+            # https://learn.microsoft.com/en-gb/azure/batch/files-and-directories#root-directory-structure
+            shared_dir = os.getenv('AZ_BATCH_NODE_SHARED_DIR')
+            os.environ['WANDB_CONFIG_DIR'] = f'{shared_dir}/.config/wandb'
+            os.environ['WANDB_CACHE_DIR'] = f'{shared_dir}/.cache/wandb'
         except KeyError as e:
             logging.error('WANDB_API_KEY not found in environment variables')
             # and make sure we reraise the error
