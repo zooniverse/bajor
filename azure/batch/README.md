@@ -16,7 +16,7 @@ docker compose run --service-ports --rm zoobot bash
 # do your dev work and test it!
 
 # e.g. test your finetuning training system is working
- python scripts/train_model_finetune_on_catalog.py.py --experiment-dir data/ --resize-size 32 --epochs 3 --batch-size 3 --accelerator cpu --gpus 0 --num-workers 2 --skip-mission-catalog --debug --catalog data/training_catalogues/workflow-3598-2022-05-cam-test.csv
+ python scripts/train_model_finetune_on_catalog.py.py --experiment-dir data/ --resize-size 32 --epochs 3 --batch-size 3 --accelerator cpu --devices auto --num-workers 2 --skip-mission-catalog --debug --catalog data/training_catalogues/workflow-3598-2022-05-cam-test.csv
 
 # or test a prediction system
  python scripts/predict_catalog_with_model.py --checkpoint-path data/pretrained_models/pytorch/zoobot.ckpt --catalog-url https://raw.githubusercontent.com/camallen/files-o-matic/main/hamlet-manifests/hamlet-subject-assistant-example-manifest.json --save-path data/results/predictions_results.csv --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
