@@ -29,7 +29,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', dest='batch_size',
                         default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
-    parser.add_argument('--gpus', default=1, type=int)
     parser.add_argument('--devices', default=1, type=int)
     parser.add_argument(
         '--progress-bar', dest='progress_bar', action='store_true')
