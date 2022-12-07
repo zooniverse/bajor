@@ -71,10 +71,18 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             batchmodels.EnvironmentSetting(
                 name='TRAINING_JOB_RESULTS_DIR',
                 value=training_job_results_dir(job_id)),
-            # set the wandb api key
+            # set the wandb env vars
             batchmodels.EnvironmentSetting(
                 name='WANDB_API_KEY',
                 value=os.getenv('WANDB_API_KEY', '')),
+            # use shared writable dir for wandb config and cache
+            # https://learn.microsoft.com/en-gb/azure/batch/files-and-directories#root-directory-structure
+            batchmodels.EnvironmentSetting(
+                name='WANDB_CONFIG_DIR',
+                value=os.getenv('WANDB_CONFIG_DIR', '/shared/.config/wandb')),
+            batchmodels.EnvironmentSetting(
+                name='WANDB_CACHE_DIR',
+                value=os.getenv('WANDB_CACHE_DIR', '/shared/.cache/wandb')),
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
