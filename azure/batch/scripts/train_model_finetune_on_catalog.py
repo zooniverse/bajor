@@ -20,28 +20,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--save-dir', dest='save_dir', type=str, required=True)
     # expects path to csv
-    parser.add_argument('--catalog', dest='catalog_loc',
-                        type=str, required=True)
-    parser.add_argument('--checkpoint', dest='checkpoint', type=str)
+    parser.add_argument('--catalog', dest='catalog_loc', type=str, required=True)
+    parser.add_argument('--checkpoint', dest='checkpoint', type=str, required=True)
     parser.add_argument('--num-workers', dest='num_workers', type=int, default=11)  # benchmarks show 11 work on our VM types - was int((os.cpu_count())
     parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=9) # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
     # V100 GPU can handle 128 - can look at --mixed-precision opt to decrease the ram use
-    parser.add_argument('--batch-size', dest='batch_size',
-                        default=128, type=int)
+    parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
     parser.add_argument('--devices', default=1, type=int)
-    parser.add_argument(
-        '--progress-bar', dest='progress_bar', action='store_true')
-    parser.add_argument('--encoder-dim', dest='encoder_dim',
-                        default=1280, type=int)
+    parser.add_argument('--progress-bar', dest='progress_bar', action='store_true')
+    parser.add_argument('--encoder-dim', dest='encoder_dim', default=1280, type=int)
     parser.add_argument('--n-layers', dest='n_layers', default=2, type=int)
-    parser.add_argument('--num-epochs', dest='num_epochs',
-                        default=50, type=int)
+    parser.add_argument('--num-epochs', dest='num_epochs', default=100, type=int)
     parser.add_argument('--save-top-k', dest='save_top_k', default=1, type=int)
     parser.add_argument('--patience', default=15, type=int)
     parser.add_argument('--wandb', default=False, action='store_true')
-    parser.add_argument('--debug', dest='debug', default=False, action='store_true',
-                        help='If true, cut each catalog down to 5k galaxies (for quick training). Should cause overfitting.')
+    parser.add_argument('--debug', dest='debug', default=False, action='store_true')
     args = parser.parse_args()
 
     # load csv file catalog location into a pandas data frame
@@ -132,7 +126,7 @@ if __name__ == '__main__':
     # derive the checkpoint and model results here for possible use later
     # e.g. like in a prediction system etc
     # however our setup will save the
-    checkpoint_path, _model = finetune.run_finetuning(
+    _model, checkpoint_path = finetune.run_finetuning(
         config, encoder, datamodule, save_dir=args.save_dir, logger=logger
     )
 
