@@ -2,11 +2,10 @@ name: Deploy to Staging
 
 on:
   workflow_run:
-    workflows: [Run tests]
-    types:
-      - completed
+    workflows: ["Run tests"]
+    types: [completed]
     branches:
-      - main
+      - 'main'
   workflow_dispatch:
 
 jobs:

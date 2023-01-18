@@ -10,32 +10,33 @@ from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
 from bajor.log_config import log
 
-# Zoobot Azure Batch predictions pool ID
-predictions_pool_id = os.getenv('POOL_ID', 'predictions_0')
+# Zoobot Azure Batch training pool ID
+training_pool_id = os.getenv('POOL_ID', 'training_1')
+
 
 # wrapper functions to isolate the jobs to the training pool
 def active_jobs_running():
-    return batch_jobs.active_jobs_running(predictions_pool_id)
+    return batch_jobs.active_jobs_running(training_pool_id)
 
 def get_active_batch_job_list():
-  return batch_jobs.get_active_batch_job_list(predictions_pool_id)
+  return batch_jobs.get_active_batch_job_list(training_pool_id)
 
 def get_non_active_batch_job_list():
-  return batch_jobs.get_non_active_batch_job_list(predictions_pool_id)
+  return batch_jobs.get_non_active_batch_job_list(training_pool_id)
 
 # schedule a training job
-def schedule_job(job_id, manifest_url, run_opts=''):
+def schedule_job(job_id, manifest_path, run_opts=''):
     submitted_job_id = create_batch_job(
-        job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id)
+        job_id=job_id, manifest_container_path=manifest_path, pool_id=training_pool_id)
     job_task_submission_status = create_job_tasks(
         job_id=job_id, run_opts=run_opts)
 
     # return the submitted job_id and task submission status dict
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
-
-def create_batch_job(job_id, manifest_url, pool_id):
-    log.debug('server_job, create_batch_job, using manifest at url: {}'.format(manifest_url))
+def create_batch_job(job_id, manifest_container_path, pool_id):
+    log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
+        manifest_container_path))
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
     job = batchmodels.JobAddParameter(
@@ -43,6 +44,12 @@ def create_batch_job(job_id, manifest_url, pool_id):
         pool_info=batchmodels.PoolInformation(pool_id=pool_id),
         # setup the env variables for all tasks in the job
         common_environment_settings=[
+            # specify the place we have setup the code that setups our catalogs and calls zoobot correctly
+            # note: this dir contains files that are copied from the blob storage for use in the runtime container
+            # e.g. 'train_model_on_catalog.py' file copied from zoobot to our blob storage system for running the zoobot training
+            #      'promote_best_checkpoint_to_model.sh' find the best checkpoint and promote it to the model dir for use in downstream systems
+            # this setup allows us to quickly iterate on code changes without requiring a rebuild to the zoobot container image to add changes
+            # -- all be set by the bajor system env vars
             batchmodels.EnvironmentSetting(
                 name='CODE_DIR_PATH',
                 value=os.getenv('CODE_DIR_PATH', 'code')),
@@ -50,20 +57,25 @@ def create_batch_job(job_id, manifest_url, pool_id):
             # this is linked to how we built the batch system, see the batch system setup code in
             # https://github.com/zooniverse/bajor/tree/main/azure/batch#create-a-azure-batch-compute-nodepool
             batchmodels.EnvironmentSetting(
-                name='PREDICTIONS_CONTAINER_MOUNT_DIR',
-                value='predictions'),
+                name='TRAINING_CONTAINER_MOUNT_DIR',
+                value='training'),
             # the models storage container mount dir
             batchmodels.EnvironmentSetting(
                 name='MODELS_CONTAINER_MOUNT_DIR',
                 value='models'),
             # set the manifest file path from the value supplied by the API
             batchmodels.EnvironmentSetting(
-                name='MANIFEST_URL',
-                value=manifest_url),
+                name='MANIFEST_PATH',
+                value=manifest_container_path),
+            # set the mission catalog file path (defaults to decals 5 at the moment)
+            # -- can be set by the bajor system MISSION_MANIFEST_PATH env var
+            batchmodels.EnvironmentSetting(
+                name='MISSION_MANIFEST_PATH',
+                value=os.getenv('MISSION_MANIFEST_PATH', 'catalogues/decals_dr5/decals_dr5_ortho_catalog.parquet')),
             # set the training results dir path
             batchmodels.EnvironmentSetting(
-                name='PREDICTIONS_JOB_RESULTS_DIR',
-                value=job_results_dir(job_id))
+                name='TRAINING_JOB_RESULTS_DIR',
+                value=training_job_results_dir(job_id))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
@@ -71,9 +83,25 @@ def create_batch_job(job_id, manifest_url, pool_id):
         on_all_tasks_complete=batchmodels.OnAllTasksComplete.terminate_job
     )
 
+    # Batch Job lifecycle hooks setup
+    # https://github.com/Azure-Samples/azure-batch-samples/blob/079a7d24b129bdd21a12efe81bdd54f0c1211aa3/Python/Batch/sample1_jobprep_and_release.py#L76-L86
+    #
+    # job preparation task can be used to download data / files used in the jobs tasks etc
+    # for prediction workloads this can be used to pull the data down
+    # from remote URLs to a local file system to be fed through the ML model
+    #
     # job preparation task
-    create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR'
-    copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
+    # NOTE: job preparation tasks are hard to debug as you can't easily extract the logs :(
+    #
+    # 1. create the job checkpoint results output directory on blob storage using a 0 byte file (mkdir -p makes this)
+    # 2. copy the training code from blob storage to a shared job directory
+    # see https://learn.microsoft.com/en-us/azure/batch/files-and-directories#root-directory-structure
+    #
+    # NOTE: possible improvement - azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
+    # this could be used for a task to copy the code from the default storage account to the job directory
+    # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
+    create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
+    copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}\"',
         #
@@ -109,36 +137,37 @@ def create_batch_job(job_id, manifest_url, pool_id):
     azure_batch_client().job.add(job)
     return job_id
 
-
-# TODO: extract these as they are all common and isolated to their mounted containers
-def job_dir(job_id):
+def training_job_dir(job_id):
     # append a timestamp to the job blob storage dir to help us navigate the job history timeline
     return f'jobs/{batch_jobs.job_submission_prefix(job_id)}'
 
-def job_results_dir(job_id):
-  return f'{job_dir(job_id)}/results'
+
+def training_job_results_dir(job_id):
+  return f'{training_job_dir(job_id)}/results'
 
 
-def job_logs_path(job_id, task_id, suffix):
-  return f'{job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
+def training_job_logs_path(job_id, task_id, suffix):
+  return f'{training_job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 
 def create_job_tasks(job_id, task_id=1, run_opts=''):
     # for persisting stdout and stderr log files in container storage
     container_sas_url = batch_jobs.storage_container_sas_url(
-        os.getenv('PREDICTIONS_STORAGE_CONTAINER', 'predictions'))
+        os.getenv('TRAINING_STORAGE_CONTAINER', 'training'))
     # persist stdout and stderr (will be removed when node removed)
     # paths are relative to the Task working directory
     stderr_destination = batchmodels.OutputFileDestination(
         container=batchmodels.OutputFileBlobContainerDestination(
             container_url=container_sas_url,
-            path=job_logs_path(job_id=job_id, task_id=task_id, suffix='stderr')
+            path=training_job_logs_path(
+              job_id=job_id, task_id=task_id, suffix='stderr')
         )
     )
     stdout_destination = batchmodels.OutputFileDestination(
         container=batchmodels.OutputFileBlobContainerDestination(
             container_url=container_sas_url,
-            path=job_logs_path(job_id=job_id, task_id=task_id, suffix='stdout')
+            path=training_job_logs_path(
+                job_id=job_id, task_id=task_id, suffix='stdout')
         )
     )
     std_err_and_out = [
@@ -158,12 +187,22 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     ]
 
     tasks = []
-    # ZOOBOT command for catalogue predictions!
+    # ZOOBOT command for catalogue based training!
+    # see azure/batch/README.md for details on how to setup
+    # the container for zoobot system
+    #
+    # train_cmd file path is copied from blob storage into this runtime container
+    # so this location is relative to the container paths and can be modified at runtime
     # see jobPreparation task for code setup
-    prediction_code_path = os.getenv('ZOOBOT_PREDICTION_CMD', 'predict_catalog_with_model.py')
-    prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{prediction_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.json'
+    train_code_path = os.getenv('ZOOBOT_SCRATCH_TRAIN_CMD', 'train_model_on_catalog.py')
+    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --experiment-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/ --mission-catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MISSION_MANIFEST_PATH --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH'
+    promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
     # redirect the stdout to stderr for logging
-    command = f'/bin/bash -c \"set -ex; python {prediction_cmd}\"'
+    promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
+    command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
+
+    # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
+    # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
 
     # create a job task to run the Zoobot training system command via the zoobot docker conatiner
     #
