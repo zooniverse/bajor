@@ -263,17 +263,6 @@ def test_predictions_to_variance_of_answer():
         smooth_or_featured_smooth_index
     )
     # first row should have smaller variance than second
-<<<<<<< HEAD
-    # assert np.allclose(variances, [0.01693762, 0.02050675])
-    print('Variances: ', variances)
-
-
-# TODO feel free to remove or make proper test
-if __name__ == '__main__':
-
-    test_predictions_to_expectation_of_answer()
-    test_predictions_to_variance_of_answer()
-=======
     assert np.allclose(variances, [0.01693762, 0.02050675])
     # print('Variances: ', variances)
 
@@ -334,4 +323,3 @@ if __name__ == '__main__':
     test_predictions_to_expectation_of_answer()
     test_predictions_to_variance_of_answer()
     test_predictions_to_bounds()
->>>>>>> e313f02d5fd977fc59f84249bbd1dd2e5eb158e1
