@@ -2,17 +2,22 @@ import logging
 import time
 import datetime
 from typing import List, Optional
-from PIL import Image
 import json
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from PIL import Image
 
 import numpy as np
 import pandas as pd
 from scipy.stats import beta
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+import pytorch_lightning as pl
+import torch
 # See https://github.com/mwalmsley/galaxy-datasets/blob/main/galaxy_datasets/pytorch/galaxy_dataset.py
-from galaxy_datasets.pytorch import galaxy_dataset
+from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
+# See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
+from zoobot.shared import save_predictions
 
 
 # add retries on requests if we have flaky networks
@@ -101,39 +106,80 @@ class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
 
 def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
     # JSON output format is used for services like the zooniverse subject assistant
+    # Could add any other decision rules into this function
     assert save_loc.endswith('.json')
-    # setup the output data structur with a schema describing the data
+    # setup the output data structure with a schema describing the data
     output_data = {
       'schema': {
         'version': 1,
         'type': 'zooniverse/subject_assistant',
-        'data': {'subject_id': 'probability_galaxy_is_not_smooth'}
+        'data': {
+            'predictions': {'subject_id': ['smooth-or-featured-cd_smooth', 'smooth-or-featured-cd_featured-or-disk', 'smooth-or-featured-cd_problem']},
+            'probabilities': {'subject_id': 'probability_at_least_20pc_featured'}
+        }
       }
+      # will add the actual data under 'data' key, below
     }
+
+    # check that the predictions mean what we think they mean
+    assert label_cols[0] == 'smooth-or-featured-cd_smooth'
+    assert label_cols[1] =='smooth-or-featured-cd_featured-or-disk'
+    assert label_cols[2] == 'smooth-or-featured-cd_problem'
+    # okay, now it's safe to hardcode the values below
+    
     # only derive each galaxies smooth or features question right now for simplicity of metric
     # i.e. we're trying to figure out if this galaxy is interesting or not for human volunteers
-    # if it's smooth it's not interesting so we can use this metric to decide to show it to volunteers
+    # if it's not featured it's not interesting so we can use this metric to decide to show it to volunteers
     smooth_or_featured_start_and_end_indices = [0, 2]
-    # the smooth answer label index
-    smooth_or_featured_smooth_index = 0
-    # lower bound of volunteers answering for a feature, i.e. 20% of volunteers say yes to the feature
-    odds_bound = 0.2
-    #
-    # variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    # expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    probability_galaxy_is_not_smooth = odds_answer_below_bounds(predictions,
+
+    # the featured answer label index
+    smooth_or_featured_featured_index = 1
+
+    # upper bound of volunteers answering for a feature, i.e. no more than e.g. 20% of volunteers select the answer (here, featured)
+    featured_upper_bound = 0.2
+
+    # currently, probability volunteers would give featured vote fraction below 20%
+    probability_volunteers_say_featured_below_bound = odds_answer_below_bounds(predictions,
         smooth_or_featured_start_and_end_indices,
-        smooth_or_featured_smooth_index,
-        odds_bound
+        smooth_or_featured_featured_index,
+        featured_upper_bound
     )
-    # output the probability data as subject_id: percentage probability galaxy is not smooth (i.e. has features / interesting!)
-    prediction_data = {id_str[n]: round((probability_galaxy_is_not_smooth[n][0] * 100.0), 4) for n in range(len(predictions))}
+
+    # just for convention and for the existing kade code, it seems more natural to have high probability galaxies be put in the active set
+    # https://github.com/zooniverse/kade/blob/9413312ba9629bd256426eb400e06c47e8d0968f/app/services/prediction_results/process.rb#L33
+    # so let's record the odds that volunteers say featured will be *above* the bound (i.e. at least 20%)
+    probability_volunteers_say_featured_above_bound = 1 - probability_volunteers_say_featured_below_bound
+
+    # output the probability data as subject_id: probability volunteers say featured above bound (rounded to 4dp)
+    # note - no longer a percentage probability
+    prediction_data = {id_str[n]: round(probability_volunteers_say_featured_above_bound[n], 4) for n in range(len(predictions))}
+
+    # also record the predictions themselves, for debugging and subject tracking
+    # any probabilities can be derived from the predictions post-hoc if needed
+    # predictions[n, :3] slices out predictions for the nth galaxy and the 0 to 2nd questions i.e. smooth/featured/problem
+    # (could generalise to e.g. smooth_or_featured_start_and_end_indices[0]:smooth_or_featured_start_and_end_indices[0]+1], but overcomplicated I think)
+    probability_data = {id_str[n]: np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions))}
+
     # add the prediction data to the output data dict
-    output_data['data'] = prediction_data
+    output_data['data'] = {'predictions': prediction_data, 'probabilities': probability_data}
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 
 
+def test_save_predictions_to_json():
+    predictions = np.random.rand(20, 3) * 100 + 1
+    id_strs = [str(x) for x in range(20)]
+    label_cols = ['smooth-or-featured-cd_smooth', 'smooth-or-featured-cd_featured-or-disk', 'smooth-or-featured-cd_problem']
+    save_loc = 'temp.json'
+
+    save_predictions_to_json(predictions, id_strs, label_cols, save_loc)
+
+    with open('temp.json', 'r') as f:
+        saved_preds = json.load(f)
+    print(saved_preds)
+
+
+# note - this is pretty much a copy of zoobot code, it might be possible to just import it
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
     # extract the uniq image identifiers
     image_id_strs = list(catalog['subject_id'])
@@ -176,7 +222,6 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     elif save_loc.endswith('.hdf5'):
         save_predictions.predictions_to_hdf5(predictions, image_id_strs, label_cols, save_loc)
     elif save_loc.endswith('.json'):
-        # contribut this upstream to zoobot
         save_predictions_to_json(predictions, image_id_strs, label_cols, save_loc)
     else:
         logging.warning('Save format of {} not recognised - assuming csv'.format(save_loc))
@@ -323,3 +368,4 @@ if __name__ == '__main__':
     test_predictions_to_expectation_of_answer()
     test_predictions_to_variance_of_answer()
     test_predictions_to_bounds()
+    test_save_predictions_to_json()
