@@ -152,13 +152,13 @@ def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
 
     # output the probability data as subject_id: probability volunteers say featured above bound (rounded to 4dp)
     # note - no longer a percentage probability
-    prediction_data = {id_str[n]: round(probability_volunteers_say_featured_above_bound[n], 4) for n in range(len(predictions))}
+    probability_data = {id_str[n]: round(probability_volunteers_say_featured_above_bound[n], 4) for n in range(len(predictions))}
 
     # also record the predictions themselves, for debugging and subject tracking
     # any probabilities can be derived from the predictions post-hoc if needed
     # predictions[n, :3] slices out predictions for the nth galaxy and the 0 to 2nd questions i.e. smooth/featured/problem
     # (could generalise to e.g. smooth_or_featured_start_and_end_indices[0]:smooth_or_featured_start_and_end_indices[0]+1], but overcomplicated I think)
-    probability_data = {id_str[n]: np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions))}
+    prediction_data = {id_str[n]: np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions))}
 
     # add the prediction data to the output data dict
     output_data['data'] = {'predictions': prediction_data, 'probabilities': probability_data}
@@ -167,7 +167,31 @@ def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
 
 
 def test_save_predictions_to_json():
-    predictions = np.random.rand(20, 3) * 100 + 1
+
+    # predictions = np.random.rand(20, 3) * 100 + 1
+
+    # some real predictions for Cosmic Dawn
+    predictions = np.array([[92.65231323,  3.26797128, 25.24700928],
+       [93.7562027 ,  3.7324903 , 33.72304916],
+       [82.39868164,  6.23918152, 20.55649376],
+       [73.68450928,  8.03439522, 20.93917465],
+       [76.07131958,  6.40088654, 29.8066597 ],
+       [54.40034485, 12.83099937, 13.50455379],
+       [90.39558411,  5.74498463, 40.09345245],
+       [44.36257935, 21.92322922, 14.49137306],
+       [57.88036728, 10.58429527, 14.5579319 ],
+       [15.32801437, 23.56198311,  7.74940348],
+       [76.99712372,  5.80586195, 47.61122131],
+       [80.41983795,  4.59404898, 42.60891342],
+       [91.29488373,  5.62464571, 37.56932831],
+       [17.39572906, 34.65762711,  8.72911072],  # this is index 14, likely to be featured
+       [54.37077332, 20.0857563 , 18.13856125],
+       [33.16508484,  7.55197144, 15.04645443],
+       [ 5.2865777 ,  2.25175548, 26.42889023],
+       [ 5.95480394,  2.10367179, 38.06949234],
+       [77.01819611,  5.05003738, 25.69354248],
+       [81.80924988,  5.31926441, 21.41218758]])
+
     id_strs = [str(x) for x in range(20)]
     label_cols = ['smooth-or-featured-cd_smooth', 'smooth-or-featured-cd_featured-or-disk', 'smooth-or-featured-cd_problem']
     save_loc = 'temp.json'
@@ -176,7 +200,10 @@ def test_save_predictions_to_json():
 
     with open('temp.json', 'r') as f:
         saved_preds = json.load(f)
-    print(saved_preds)
+    # print(saved_preds)
+
+    assert saved_preds['data']['predictions']['14'] == [54.371, 20.086, 18.139]
+    assert saved_preds['data']['probabilities']['14'] > 0.5
 
 
 # note - this is pretty much a copy of zoobot code, it might be possible to just import it
