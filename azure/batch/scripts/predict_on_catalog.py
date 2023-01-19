@@ -7,20 +7,13 @@ import json
 
 import numpy as np
 import pandas as pd
-from scipy.stats import beta  # possible new dependency, Cam
+from scipy.stats import beta
 import requests
-import torch
-import pytorch_lightning as pl
-
-from zoobot.shared import save_predictions
-<<<<<<< HEAD
-# TODO these imports will work once galaxy_datasets PR merged
-=======
->>>>>>> e313f02d5fd977fc59f84249bbd1dd2e5eb158e1
-from galaxy_datasets.pytorch import galaxy_datamodule, galaxy_dataset
-
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+# See https://github.com/mwalmsley/galaxy-datasets/blob/main/galaxy_datasets/pytorch/galaxy_dataset.py
+from galaxy_datasets.pytorch import galaxy_dataset
+
 
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
@@ -114,7 +107,7 @@ def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
       'schema': {
         'version': 1,
         'type': 'zooniverse/subject_assistant',
-        'data': { 'subject_id': [['variance_of_prediction'], ['expectation_galaxy_is_smooth']] }
+        'data': {'subject_id': 'probability_galaxy_is_not_smooth'}
       }
     }
     # only derive each galaxies smooth or features question right now for simplicity of metric
@@ -123,12 +116,18 @@ def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
     smooth_or_featured_start_and_end_indices = [0, 2]
     # the smooth answer label index
     smooth_or_featured_smooth_index = 0
-    variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    prediction_data = {}
-    for n in range(len(predictions)):
-        prediction_data[id_str[n]] = [
-            variances[n].tolist(), expectations[n].tolist()]
+    # lower bound of volunteers answering for a feature, i.e. 20% of volunteers say yes to the feature
+    odds_bound = 0.2
+    #
+    # variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
+    # expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
+    probability_galaxy_is_not_smooth = odds_answer_below_bounds(predictions,
+        smooth_or_featured_start_and_end_indices,
+        smooth_or_featured_smooth_index,
+        odds_bound
+    )
+    # output the probability data as subject_id: percentage probability galaxy is not smooth (i.e. has features / interesting!)
+    prediction_data = {id_str[n]: round((probability_galaxy_is_not_smooth[n][0] * 100.0), 4) for n in range(len(predictions))}
     # add the prediction data to the output data dict
     output_data['data'] = prediction_data
     with open(save_loc, 'w') as out_file:
@@ -270,7 +269,8 @@ def test_predictions_to_variance_of_answer():
 def odds_answer_below_bounds(predictions: np.ndarray,  question_indices: List[int], answer_index: int, bound) -> np.ndarray:
     """
     Calculate the predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound'
-    (for a given question and answer) 
+    (for a given question and answer)
+
     e.g. the predicted odds that an infinite number of volunteers would answer `smooth' to `smooth or featured' less than 20% of the time
 
     (If you want the odds above bounds, just do 1 - this)

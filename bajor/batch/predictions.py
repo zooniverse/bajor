@@ -161,6 +161,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # ZOOBOT command for catalogue predictions!
     # see jobPreparation task for code setup
     prediction_code_path = os.getenv('ZOOBOT_PREDICTION_CMD', 'predict_catalog_with_model.py')
+    # TODO: perhaps we can add the output file extension as a job env param that can be modified by job runtime params
     prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{prediction_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.json'
     # redirect the stdout to stderr for logging
     command = f'/bin/bash -c \"set -ex; python {prediction_cmd}\"'

@@ -26,8 +26,8 @@ if __name__ == '__main__':
     parser.add_argument('--save-path', dest='save_loc', type=str, required=True)
     parser.add_argument('--catalog-url', dest='catalog_url', type=str, required=True)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=1)
-    parser.add_argument('--num-workers', dest='num_workers', type=int, default=11)  # benchmarks show 11 work on our VM types - was int((os.cpu_count())
-    parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=9)  # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
+    parser.add_argument('--num-workers', dest='num_workers', type=int, default=int(os.cpu_count()))
+    parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=4)
     # V100 GPU can handle 128 - can look at --mixed-precision opt to decrease the ram use
     parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
