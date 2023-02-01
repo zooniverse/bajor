@@ -1,22 +1,25 @@
+import os
 import logging
 import time
 import datetime
 from typing import List, Optional
-from PIL import Image
 import json
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from PIL import Image
 
 import numpy as np
 import pandas as pd
 from scipy.stats import beta
-import requests
-import torch
 import pytorch_lightning as pl
-
+import torch
+# See https://github.com/mwalmsley/galaxy-datasets/blob/main/galaxy_datasets/pytorch/galaxy_dataset.py
+from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
+# See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
 from zoobot.shared import save_predictions
-from galaxy_datasets.pytorch import galaxy_datamodule, galaxy_dataset
 
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
@@ -102,41 +105,66 @@ class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
         self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.transform)
 
 
-def save_predictions_to_json(predictions, id_str, label_cols, save_loc):
+def save_predictions_to_json(predictions, image_ids, label_cols, save_loc):
     # JSON output format is used for services like the zooniverse subject assistant
+    # Could add any other decision rules into this function
     assert save_loc.endswith('.json')
-    # setup the output data structur with a schema describing the data
+    # setup the output data structure with a schema describing the data
     output_data = {
       'schema': {
         'version': 1,
         'type': 'zooniverse/subject_assistant',
-        'data': {'subject_id': 'probability_galaxy_is_not_smooth'}
+        'data': { 'subject_id': ['probability_at_least_20pc_featured', ['smooth-or-featured-cd_smooth_prediction', 'smooth-or-featured-cd_featured-or-disk_prediction', 'smooth-or-featured-cd_problem_prediction'] ] }
       }
+      # will add the actual data under 'data' key, below
     }
+
+    # check that the predictions mean what we think they mean
+    assert label_cols[0] == 'smooth-or-featured-cd_smooth', 'column label 0 is not "smooth-or-featured-cd_smooth" label'
+    assert label_cols[1] == 'smooth-or-featured-cd_featured-or-disk', 'column label 1 is not "smooth-or-featured-cd_featured-or-disk" label'
+    assert label_cols[2] == 'smooth-or-featured-cd_problem', 'column label 2 is not "smooth-or-featured-cd_problem" label'
+    # okay, now it's safe to hardcode the values below
+
     # only derive each galaxies smooth or features question right now for simplicity of metric
     # i.e. we're trying to figure out if this galaxy is interesting or not for human volunteers
-    # if it's smooth it's not interesting so we can use this metric to decide to show it to volunteers
+    # if it's not featured it's not interesting so we can use this metric to decide to show it to volunteers
     smooth_or_featured_start_and_end_indices = [0, 2]
-    # the smooth answer label index
-    smooth_or_featured_smooth_index = 0
-    # lower bound of volunteers answering for a feature, i.e. 20% of volunteers say yes to the feature
-    odds_bound = 0.2
-    #
-    # variances = predictions_to_variance_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    # expectations = predictions_to_expectation_of_answer(predictions, smooth_or_featured_start_and_end_indices, smooth_or_featured_smooth_index)
-    probability_galaxy_is_not_smooth = odds_answer_below_bounds(predictions,
+
+    # the featured answer label index
+    smooth_or_featured_featured_index = 1
+
+    # upper bound of volunteers answering for a feature, i.e. no more than e.g. 20% of volunteers select the answer (here, featured)
+    # allow this value to be set via the ENV variable with a fallback setting (0.2) that can be changed in code as needed.
+    featured_upper_bound = float(os.environ.get('GZ_FEATURED_UPPER_BOUND', 0.2))
+
+    # currently, probability volunteers would give featured vote fraction below 20%
+    probability_volunteers_say_featured_below_bound = odds_answer_below_bounds(predictions,
         smooth_or_featured_start_and_end_indices,
-        smooth_or_featured_smooth_index,
-        odds_bound
+        smooth_or_featured_featured_index,
+        featured_upper_bound
     )
-    # output the probability data as subject_id: percentage probability galaxy is not smooth (i.e. has features / interesting!)
-    prediction_data = {id_str[n]: round((probability_galaxy_is_not_smooth[n][0] * 100.0), 4) for n in range(len(predictions))}
+
+    # just for convention and for the existing kade code, it seems more natural to have high probability galaxies be put in the active set
+    # https://github.com/zooniverse/kade/blob/9413312ba9629bd256426eb400e06c47e8d0968f/app/services/prediction_results/process.rb#L33
+    # so let's record the odds that volunteers say featured will be *above* the bound (i.e. at least 20%)
+    probability_volunteers_say_featured_above_bound = 1 - probability_volunteers_say_featured_below_bound
+
+    # output the probability data as subject_id: probability volunteers say featured above bound (rounded to 4dp)
+    # note - no longer a percentage probability
+    probability_data = [ round(probability_volunteers_say_featured_above_bound[n], 4) for n in range(len(predictions)) ]
+
+    # also record the predictions themselves, for debugging and subject tracking
+    # any probabilities can be derived from the predictions post-hoc if needed
+    # predictions[n, :3] slices out predictions for the nth galaxy and the 0 to 2nd questions i.e. smooth/featured/problem
+    # (could generalise to e.g. smooth_or_featured_start_and_end_indices[0]:smooth_or_featured_start_and_end_indices[0]+1], but overcomplicated I think)
+    prediction_data = [ np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions)) ]
+
     # add the prediction data to the output data dict
-    output_data['data'] = prediction_data
+    output_data['data'] = { image_ids[n]: [probability_data[n], prediction_data[n]] for n in range(len(image_ids)) }
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 
-
+# note - this is pretty much a copy of zoobot code, it might be possible to just import it
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
     # extract the uniq image identifiers
     image_id_strs = list(catalog['subject_id'])
@@ -179,7 +207,6 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     elif save_loc.endswith('.hdf5'):
         save_predictions.predictions_to_hdf5(predictions, image_id_strs, label_cols, save_loc)
     elif save_loc.endswith('.json'):
-        # contribut this upstream to zoobot
         save_predictions_to_json(predictions, image_id_strs, label_cols, save_loc)
     else:
         logging.warning('Save format of {} not recognised - assuming csv'.format(save_loc))
@@ -234,6 +261,38 @@ def predictions_to_variance_of_answer(predictions: np.ndarray,  question_indices
     return alpha_i * (alpha_all - alpha_i) / (alpha_all**2 * (alpha_all + 1))
 
 
+def odds_answer_below_bounds(predictions: np.ndarray,  question_indices: List[int], answer_index: int, bound) -> np.ndarray:
+    """
+    Calculate the predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound'
+    (for a given question and answer)
+
+    e.g. the predicted odds that an infinite number of volunteers would answer `smooth' to `smooth or featured' less than 20% of the time
+
+    (If you want the odds above bounds, just do 1 - this)
+
+    ("predicted infinite-volunteer vote fraction" is the intuitive way to say "the value drawn from the dirichlet distribution")
+
+    Args:
+        predictions (np.ndarray): Dirichlet concentrations of shape (n_galaxies, n_answers)
+        question_indices (List[int]): Start and end column index of the question's answers (e.g. [0, 2] for smooth or featured)
+        answer_index (int): Column index of the answer (e.g. 0 for smooth)
+        bound (float, optional): highest allowed infinite-volunter vote fraction. Defaults to 0.2.
+
+    Returns:
+        np.ndarray: predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound', shape (batch)
+    """
+    concentrations_q = predictions[:, question_indices[0]:question_indices[1]+1]
+    concentrations_a = predictions[:, answer_index]
+    # dirichlet of this or not this is equivalent to beta distribution with concentrations (this, sum_of_not_this)
+    concentrations_not_a = concentrations_q.sum(axis=1) - concentrations_a
+    # concentrations_a and concentrations_not_a have shape (batch)
+    return beta(a=concentrations_a, b=concentrations_not_a).cdf(bound)  # will broadcast
+
+    # NB: we can actually test this
+    # samples_of_a = beta(a=concentrations_a, b=concentrations_not_a).rvs((1000, len(predictions)))  # will broadcast
+    # print(np.mean(samples_of_a < bound, axis=0))  # should be similar to .cdf(bound) above
+
+
 def test_predictions_to_expectation_of_answer():
 
     predictions = np.array([[8., 2., 1.5], [4., 5., 1.5]])
@@ -269,35 +328,47 @@ def test_predictions_to_variance_of_answer():
     # print('Variances: ', variances)
 
 
-def odds_answer_below_bounds(predictions: np.ndarray,  question_indices: List[int], answer_index: int, bound) -> np.ndarray:
-    """
-    Calculate the predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound'
-    (for a given question and answer)
-    e.g. the predicted odds that an infinite number of volunteers would answer `smooth' to `smooth or featured' less than 20% of the time
+def test_save_predictions_to_json():
 
-    (If you want the odds above bounds, just do 1 - this)
+    # predictions = np.random.rand(20, 3) * 100 + 1
 
-    ("predicted infinite-volunteer vote fraction" is the intuitive way to say "the value drawn from the dirichlet distribution")
+    # some real predictions for Cosmic Dawn
+    predictions = np.array([[92.65231323,  3.26797128, 25.24700928],
+       [93.7562027 ,  3.7324903 , 33.72304916],
+       [82.39868164,  6.23918152, 20.55649376],
+       [73.68450928,  8.03439522, 20.93917465],
+       [76.07131958,  6.40088654, 29.8066597 ],
+       [54.40034485, 12.83099937, 13.50455379],
+       [90.39558411,  5.74498463, 40.09345245],
+       [44.36257935, 21.92322922, 14.49137306],
+       [57.88036728, 10.58429527, 14.5579319 ],
+       [15.32801437, 23.56198311,  7.74940348],
+       [76.99712372,  5.80586195, 47.61122131],
+       [80.41983795,  4.59404898, 42.60891342],
+       [91.29488373,  5.62464571, 37.56932831],
+       [17.39572906, 34.65762711,  8.72911072],  # this is index 14, likely to be featured
+       [54.37077332, 20.0857563 , 18.13856125],
+       [33.16508484,  7.55197144, 15.04645443],
+       [ 5.2865777 ,  2.25175548, 26.42889023],
+       [ 5.95480394,  2.10367179, 38.06949234],
+       [77.01819611,  5.05003738, 25.69354248],
+       [81.80924988,  5.31926441, 21.41218758]])
 
-    Args:
-        predictions (np.ndarray): Dirichlet concentrations of shape (n_galaxies, n_answers)
-        question_indices (List[int]): Start and end column index of the question's answers (e.g. [0, 2] for smooth or featured)
-        answer_index (int): Column index of the answer (e.g. 0 for smooth)
-        bound (float, optional): highest allowed infinite-volunter vote fraction. Defaults to 0.2.
-
-    Returns:
-        np.ndarray: predicted odds that the galaxy would have an infinite-volunteer vote fraction no higher than `bound', shape (batch)
-    """
-    concentrations_q = predictions[:, question_indices[0]:question_indices[1]+1]
-    concentrations_a = predictions[:, answer_index]
-    # dirichlet of this or not this is equivalent to beta distribution with concentrations (this, sum_of_not_this)
-    concentrations_not_a = concentrations_q.sum(axis=1) - concentrations_a
-    # concentrations_a and concentrations_not_a have shape (batch)
-    return beta(a=concentrations_a, b=concentrations_not_a).cdf(bound)  # will broadcast
-
-    # NB: we can actually test this
-    # samples_of_a = beta(a=concentrations_a, b=concentrations_not_a).rvs((1000, len(predictions)))  # will broadcast
-    # print(np.mean(samples_of_a < bound, axis=0))  # should be similar to .cdf(bound) above
+    id_strs = [str(x) for x in range(20)]
+    label_cols = ['smooth-or-featured-cd_smooth', 'smooth-or-featured-cd_featured-or-disk', 'smooth-or-featured-cd_problem']
+    save_loc = 'temp.json'
+    save_predictions_to_json(predictions, id_strs, label_cols, save_loc)
+    # process the saved results file for testing
+    with open(save_loc, 'r') as f:
+        saved_preds = json.load(f)
+        # print(saved_preds)
+    try:
+      # 'data': { 'subject_id': ['probability_at_least_20pc_featured', [...predictions] ] }
+      assert saved_preds['data']['14'][0] > 0.5
+      assert saved_preds['data']['14'][1] == [54.371, 20.086, 18.139]
+    finally:
+      # cleanup the test file artefact
+      os.unlink(save_loc)
 
 
 def test_predictions_to_bounds():
@@ -325,3 +396,4 @@ if __name__ == '__main__':
     test_predictions_to_expectation_of_answer()
     test_predictions_to_variance_of_answer()
     test_predictions_to_bounds()
+    test_save_predictions_to_json()
