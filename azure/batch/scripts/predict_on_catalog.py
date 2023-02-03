@@ -151,7 +151,7 @@ def save_predictions_to_json(predictions, image_ids, label_cols, save_loc):
 
     # output the probability data as subject_id: probability volunteers say featured above bound (rounded to 4dp)
     # note - no longer a percentage probability
-    probability_data = [ round(probability_volunteers_say_featured_above_bound[n], 4) for n in range(len(predictions)) ]
+    probability_data = [ np.round(probability_volunteers_say_featured_above_bound[n], 4) for n in range(len(predictions)) ]
 
     # also record the predictions themselves, for debugging and subject tracking
     # any probabilities can be derived from the predictions post-hoc if needed
