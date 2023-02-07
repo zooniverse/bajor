@@ -48,6 +48,8 @@ spec:
             value: '80'
           - name: LOG_LEVEL
             value: 'INFO'
+          - name: TRAINING_RUN_OPTS
+            value: '--wandb'
           envFrom:
           - secretRef:
               name: bajor-common-env-vars
