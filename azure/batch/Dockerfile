@@ -25,4 +25,4 @@ RUN ln -s /usr/local/bin/pip3 /usr/bin/pip3
 
 # install our dependencies (see setup.py)
 COPY setup.py .
-RUN pip install .
+RUN pip install . --extra-index-url https://download.pytorch.org/whl/cu113
