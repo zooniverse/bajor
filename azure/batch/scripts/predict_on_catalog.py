@@ -160,7 +160,7 @@ def save_predictions_to_json(predictions, image_ids, label_cols, save_loc):
     prediction_data = [ np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions)) ]
 
     # add the prediction data to the output data dict
-    output_data['data'] = { image_ids[n]: [probability_data[n], prediction_data[n]] for n in range(len(image_ids)) }
+    output_data['data'] = { image_ids[n]: [probability_data[n][0], prediction_data[n]] for n in range(len(image_ids)) }
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 
