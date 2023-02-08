@@ -14,7 +14,6 @@ honeybadger = "^0.8.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
-numpy = "^1.21.2"
 
 [tool.poetry.scripts]
 start = "bajor.api:start_app"
