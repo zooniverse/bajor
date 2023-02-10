@@ -49,7 +49,7 @@ spec:
           - name: LOG_LEVEL
             value: 'DEBUG'
           - name: TRAINING_RUN_OPTS
-            value: '--debug'
+            value: '--debug --wandb'
           envFrom:
           - secretRef:
               name: bajor-common-env-vars
