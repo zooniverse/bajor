@@ -8,7 +8,7 @@ import pytorch_lightning as pl
 
 from zoobot.pytorch.training import finetune
 import predict_on_catalog
-from zoobot.shared import label_metadata
+from galaxy_datasets.shared import label_metadata
 
 def load_model_from_checkpoint(checkpoint_path):
     logging.info('Returning model from checkpoint: {}'.format(checkpoint_path))
