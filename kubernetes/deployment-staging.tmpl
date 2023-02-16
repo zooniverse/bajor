@@ -50,6 +50,8 @@ spec:
             value: 'DEBUG'
           - name: TRAINING_RUN_OPTS
             value: '--debug --wandb'
+          - name: ZOOBOT_CHECKPOINT_TARGET
+            value: 'staging/zoobot.ckpt'
           envFrom:
           - secretRef:
               name: bajor-common-env-vars

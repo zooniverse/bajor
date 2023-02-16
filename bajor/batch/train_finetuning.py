@@ -74,7 +74,11 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # set the wandb env vars
             batchmodels.EnvironmentSetting(
                 name='WANDB_API_KEY',
-                value=os.getenv('WANDB_API_KEY', ''))
+                value=os.getenv('WANDB_API_KEY', '')),
+            # set the zoobot saved model checkpoint file path
+            batchmodels.EnvironmentSetting(
+                name='ZOOBOT_CHECKPOINT_TARGET',
+                value=os.getenv('ZOOBOT_CHECKPOINT_TARGET', 'zoobot.ckpt'))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
