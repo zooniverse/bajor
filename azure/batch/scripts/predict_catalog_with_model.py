@@ -56,7 +56,8 @@ if __name__ == '__main__':
     datamodule_args = {
         'batch_size': args.batch_size,
         'num_workers': args.num_workers,
-        'prefetch_factor': args.prefetch_factor
+        'prefetch_factor': args.prefetch_factor,
+        'resize_after_crop': 300 
     }
     trainer_args = {
         'gpus': args.gpus,

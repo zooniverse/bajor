@@ -58,7 +58,8 @@ if __name__ == '__main__':
         catalog=kade_catalog,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        prefetch_factor=args.prefetch_factor
+        prefetch_factor=args.prefetch_factor,
+        resize_after_crop=300  # gz evo checkpoint now expects 300x300 input image
         # uses default_args
     )
     datamodule.setup()
