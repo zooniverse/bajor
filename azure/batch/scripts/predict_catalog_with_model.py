@@ -12,8 +12,7 @@ from zoobot.shared import label_metadata
 
 def load_model_from_checkpoint(checkpoint_path):
     logging.info('Returning model from checkpoint: {}'.format(checkpoint_path))
-
-    return finetune.FinetunedZoobotLightningModule.load_from_checkpoint(checkpoint_path)
+    return finetune.FinetuneableZoobotTree.load_from_checkpoint(checkpoint_path)
 
 if __name__ == '__main__':
     logging.basicConfig(
