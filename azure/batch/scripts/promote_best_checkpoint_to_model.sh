@@ -18,4 +18,4 @@ mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RES
 cp -f $best_checkpoint $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/
 
 # overwrite the existing deployed model for use in other services (prediction scripts etc)
-cp -f $best_checkpoint $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/zoobot.ckpt
+cp -f $best_checkpoint $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$ZOOBOT_CHECKPOINT_TARGET

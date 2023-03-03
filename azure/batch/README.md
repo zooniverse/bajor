@@ -21,8 +21,16 @@ docker compose run --service-ports --rm zoobot bash
 # or test a prediction system
  python scripts/predict_catalog_with_model.py --checkpoint-path data/external/checkpoints/zoobot.ckpt --catalog-url https://raw.githubusercontent.com/camallen/files-o-matic/main/hamlet-manifests/hamlet-subject-assistant-example-manifest.json --save-path data/external/prediction_results/results.json --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
 
-# when you are ready to publish the image follow the steps below
+
+# install and run the tests for the scripts
+pip install pytest # we don't include this in the dockerfile by default as it's not needed for the batch system
+# run the tests
+pytest scripts/test_predict_on_catalog.py
+# or run all the tests
+pytest scripts/
 ```
+
+When you are ready to publish the image follow the steps below.
 
 ## Build the Docker image for Azure Batch node pools
 
