@@ -52,6 +52,8 @@ spec:
             value: '--debug --wandb'
           - name: ZOOBOT_CHECKPOINT_TARGET
             value: 'staging-zoobot.ckpt'
+          - name: ZOOBOT_FINETUNE_CHECKPOINT_FILE
+            value: 'zoobot_pretrained_model_staging.ckpt'
           envFrom:
           - secretRef:
               name: bajor-common-env-vars
