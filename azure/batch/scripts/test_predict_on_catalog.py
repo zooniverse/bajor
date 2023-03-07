@@ -57,6 +57,11 @@ def real_predictions():
     return predictions
 
 
+@pytest.fixture
+def predictions_for_two_samples(real_predictions):
+    return np.dstack([real_predictions]*2)
+
+
 def test_predictions_to_expectation_of_answer(predictions_with_sample_dim, expectation_with_sample_dim):
 
     smooth_or_featured_start_and_end_indices = [0, 2]
@@ -75,7 +80,6 @@ def test_predictions_to_expectation_of_answer(predictions_with_sample_dim, expec
 
 def test_predictions_to_variance_of_answer(predictions_with_sample_dim, variance_with_sample_dim):
 
-
     smooth_or_featured_start_and_end_indices = [0, 2]
     smooth_or_featured_smooth_index = 0
 
@@ -91,8 +95,6 @@ def test_predictions_to_variance_of_answer(predictions_with_sample_dim, variance
 
 def test_save_predictions_to_json(real_predictions):
 
-
-
     id_strs = [str(x) for x in range(len(real_predictions))]
     label_cols = ['smooth-or-featured-cd_smooth', 'smooth-or-featured-cd_featured-or-disk', 'smooth-or-featured-cd_problem']
     save_loc = 'temp.json'
@@ -102,12 +104,46 @@ def test_save_predictions_to_json(real_predictions):
         saved_preds = json.load(f)
         # print(saved_preds)
     try:
-      # 'data': { 'subject_id': ['probability_at_least_20pc_featured', [...predictions] ] }
-      assert saved_preds['data']['14'][0] > 0.5
-      assert saved_preds['data']['14'][1] == [[54.371], [20.086], [18.139]]
+        # 'data': { 
+        #     'subject_id': {
+        #         'sample_num': ['probability_at_least_20pc_featured', [...predictions] ] 
+        #     }
+        # }
+        subject_id = '14'
+        sample_num = '0' # only 1 sample in the real_predictions fixtures
+        assert saved_preds['data'][subject_id][sample_num][0] > 0.5
+        assert saved_preds['data'][subject_id][sample_num][1] == [54.371, 20.086, 18.139]
     finally:
-      # cleanup the test file artefact
-      os.unlink(save_loc)
+        # cleanup the test file artefact
+        os.unlink(save_loc)
+
+
+def test_multi_samples_save_predictions_to_json(predictions_for_two_samples):
+
+    id_strs = [str(x) for x in range(len(predictions_for_two_samples))]
+    label_cols = ['smooth-or-featured-cd_smooth', 'smooth-or-featured-cd_featured-or-disk', 'smooth-or-featured-cd_problem']
+    save_loc = 'temp.json'
+    predict_on_catalog.save_predictions_to_json(predictions_for_two_samples, id_strs, label_cols, save_loc)
+    # process the saved results file for testing
+    with open(save_loc, 'r') as f:
+        saved_preds = json.load(f)
+        # print(saved_preds)
+    try:
+        # 'data': { 
+        #     'subject_id': {
+        #         'sample_num': ['probability_at_least_20pc_featured', [...predictions] ] 
+        #     }
+        # }
+        subject_id = '14'
+        first_sample = '0' # inspect the first sample
+        second_sample = '1' # inspect the first sample
+        assert saved_preds['data'][subject_id][first_sample][0] > 0.5
+        assert saved_preds['data'][subject_id][first_sample][1] == [54.371, 20.086, 18.139]
+        assert saved_preds['data'][subject_id][second_sample][0] > 0.5
+        assert saved_preds['data'][subject_id][second_sample][1] == [54.371, 20.086, 18.139]
+    finally:
+        # cleanup the test file artefact
+        os.unlink(save_loc)
 
 
 def test_predictions_to_bounds(predictions_with_sample_dim, odds_below_bound_with_sample_dim):
