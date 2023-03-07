@@ -120,16 +120,24 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
         logging.info('adding sample=1 dimension to predictions')
         predictions = np.expand_dims(predictions, axis=2)
     assert predictions.ndim == 3
-    
+
     assert save_loc.endswith('.json')
     # setup the output data structure with a schema describing the data
     output_data = {
       'schema': {
         'version': 1,
         'type': 'zooniverse/subject_assistant',
-        'data': { 'subject_id': ['probability_at_least_20pc_featured', ['smooth-or-featured-cd_smooth_prediction', 'smooth-or-featured-cd_featured-or-disk_prediction'], ['smooth-or-featured-cd_problem_prediction'] ] }
-      }
-      # will add the actual data under 'data' key, below
+        'data': { 
+            'subject_id': {
+                "sample_num": [
+                    'probability_at_least_20pc_featured', 
+                    ['smooth-or-featured-cd_smooth_prediction', 'smooth-or-featured-cd_featured-or-disk_prediction', 'smooth-or-featured-cd_problem_prediction']
+                ]
+            }
+        }
+      },
+      # create an empty data dict in order to inject results into it as we loop through the subject predictions
+      'data': {}
     }
 
     # check that the predictions mean what we think they mean
@@ -173,7 +181,33 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
     prediction_data = [ np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions)) ]
 
     # add the prediction data to the output data dict
-    output_data['data'] = { image_ids[n]: [probability_data[n], prediction_data[n]] for n in range(len(image_ids)) }
+    for image_id_offset in range(len(image_ids)):
+        # create the output data for each image we predict on 
+        # note this map is keyed for each sample requested (i.e. num_samples)
+        # this allows us to have multiple prediction results for the same image
+        image_id_results = {}
+
+        # number of results in any category correlates to the n_samples param, we could pass this as a function arg longer term
+        num_samples = len(prediction_data[image_id_offset][0])
+
+        # for each sample run, format the probability and prediction data
+        for num_sample in range(num_samples):
+            # note the following for loop 
+            # i failed to write this with nested list comprehensions
+            # and generators as i needed to inject the local num_sample variable
+            # that said i find the for loop syntax easier to understand than what i was writing
+            prediction_data_for_sample = []
+            for predictions in prediction_data[image_id_offset]:
+                prediction_data_for_sample.append(predictions[num_sample])
+            
+            image_id_results[num_sample] = [ 
+                probability_data[image_id_offset][num_sample],
+                prediction_data_for_sample
+            ]
+
+        subject_id = image_ids[image_id_offset]
+        output_data['data'][subject_id] = image_id_results
+    
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 
