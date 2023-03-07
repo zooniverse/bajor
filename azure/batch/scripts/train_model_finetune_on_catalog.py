@@ -5,7 +5,6 @@ import pandas as pd
 from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
 
 from zoobot.pytorch.training import finetune
-from zoobot.pytorch.estimators import define_model
 from zoobot.shared.schemas import cosmic_dawn_ortho_schema
 
 if __name__ == '__main__':
@@ -59,34 +58,11 @@ if __name__ == '__main__':
         catalog=kade_catalog,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        prefetch_factor=args.prefetch_factor
+        prefetch_factor=args.prefetch_factor,
+        resize_after_crop=300  # gz evo checkpoint now expects 300x300 input image
         # uses default_args
     )
     datamodule.setup()
-
-    # use a config object to setup the finetuning system
-    config = {
-        'checkpoint': {
-            'file_template': 'epoch-{epoch}-val_loss-{finetuning/val_loss:.7f}',
-            'save_top_k': args.save_top_k
-        },
-        'early_stopping': {
-            'patience': args.patience
-        },
-        'trainer': {
-            'devices': args.devices,
-            'accelerator': args.accelerator
-        },
-        'finetune': {
-            'encoder_dim': args.encoder_dim,
-            'n_epochs': args.num_epochs,
-            'n_layers': args.n_layers,
-            'label_dim': len(cosmic_dawn_ortho_schema.label_cols),
-            'label_mode': 'count',
-            'schema': cosmic_dawn_ortho_schema,
-            'prog_bar': args.progress_bar
-        }
-    }
 
     if args.wandb:
         try:
@@ -111,24 +87,31 @@ if __name__ == '__main__':
         logger = None
 
     # load the model from checkpoint
-    model = define_model.ZoobotLightningModule.load_from_checkpoint(
-        args.checkpoint)
+    model = finetune.FinetuneableZoobotTree(
+        checkpoint_loc=args.checkpoint,
+        # params specific to tree finetuning
+        schema=cosmic_dawn_ortho_schema,
+        # params for superclass i.e. any finetuning
+        encoder_dim=args.encoder_dim,
+        n_layers=args.n_layers,
+        prog_bar=args.progress_bar
+    )
 
-    """
-    Model:  ZoobotLightningModule(
-    (train_accuracy): Accuracy()
-    (val_accuracy): Accuracy()
-    (model): Sequential(
-      (0): EfficientNet(
-    """
-    encoder = model.get_submodule('model.0')  # includes avgpool and head
+    trainer = finetune.get_trainer(
+        save_dir=args.save_dir,
+        logger=logger,
+        max_epochs=args.num_epochs,
+        devices= args.devices,
+        accelerator=args.accelerator,
+        patience=args.patience,
+        save_top_k=args.save_top_k,
+        file_template='epoch-{epoch}-val_loss-{finetuning/val_loss:.7f}'
+    )
 
     # derive the checkpoint and model results here for possible use later
     # e.g. like in a prediction system etc
-    # however our setup will save the
-    _model, checkpoint_path = finetune.run_finetuning(
-        config, encoder, datamodule, save_dir=args.save_dir, logger=logger
-    )
+    trainer.fit(model, datamodule)
 
+    best_checkpoint_path = trainer.checkpoint_callback.best_model_path
     logging.info(
-        f'Finished training on catalog - checkpoint save to: {checkpoint_path}')
+        f'Finished training on catalog - checkpoint save to: {best_checkpoint_path}')

@@ -127,7 +127,7 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
       'schema': {
         'version': 1,
         'type': 'zooniverse/subject_assistant',
-        'data': { 'subject_id': ['probability_at_least_20pc_featured', [['smooth-or-featured-cd_smooth_prediction'], ['smooth-or-featured-cd_featured-or-disk_prediction'], ['smooth-or-featured-cd_problem_prediction']] ] }
+        'data': { 'subject_id': ['probability_at_least_20pc_featured', ['smooth-or-featured-cd_smooth_prediction', 'smooth-or-featured-cd_featured-or-disk_prediction'], ['smooth-or-featured-cd_problem_prediction'] ] }
       }
       # will add the actual data under 'data' key, below
     }
@@ -173,7 +173,7 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
     prediction_data = [ np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions)) ]
 
     # add the prediction data to the output data dict
-    output_data['data'] = { image_ids[n]: [probability_data[n][0], prediction_data[n]] for n in range(len(image_ids)) }
+    output_data['data'] = { image_ids[n]: [probability_data[n], prediction_data[n]] for n in range(len(image_ids)) }
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 

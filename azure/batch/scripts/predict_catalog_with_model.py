@@ -12,8 +12,7 @@ from galaxy_datasets.shared import label_metadata
 
 def load_model_from_checkpoint(checkpoint_path):
     logging.info('Returning model from checkpoint: {}'.format(checkpoint_path))
-
-    return finetune.FinetunedZoobotLightningModule.load_from_checkpoint(checkpoint_path)
+    return finetune.FinetuneableZoobotTree.load_from_checkpoint(checkpoint_path)
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -57,7 +56,8 @@ if __name__ == '__main__':
     datamodule_args = {
         'batch_size': args.batch_size,
         'num_workers': args.num_workers,
-        'prefetch_factor': args.prefetch_factor
+        'prefetch_factor': args.prefetch_factor,
+        'resize_after_crop': 300 
     }
     trainer_args = {
         'gpus': args.gpus,
