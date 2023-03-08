@@ -1,5 +1,6 @@
 import logging
 import argparse
+import os
 
 import pandas as pd
 from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
@@ -21,8 +22,8 @@ if __name__ == '__main__':
     # expects path to csv
     parser.add_argument('--catalog', dest='catalog_loc', type=str, required=True)
     parser.add_argument('--checkpoint', dest='checkpoint', type=str, required=True)
-    parser.add_argument('--num-workers', dest='num_workers', type=int, default=11)  # benchmarks show 11 work on our VM types - was int((os.cpu_count())
-    parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=9) # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
+    parser.add_argument('--num-workers', dest='num_workers', type=int, default=int((os.cpu_count())))
+    parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=4)
     # V100 GPU can handle 128 - can look at --mixed-precision opt to decrease the ram use
     parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
