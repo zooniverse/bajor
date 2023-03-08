@@ -19,7 +19,7 @@ docker compose run --service-ports --rm zoobot bash
  python scripts/train_model_finetune_on_catalog.py --save-dir data/external/finetuning_results/ --batch-size 3 --accelerator cpu --num-workers 2 --checkpoint data/external/models/checkpoints/zoobot.ckpt --catalog data/external/cosmic_dawn/catalogs/gz_cosmic_dawn_ortho_train_catalog_subset.csv
 
 # or test a prediction system
- python scripts/predict_catalog_with_model.py --checkpoint-path data/external/checkpoints/zoobot.ckpt --catalog-url https://raw.githubusercontent.com/camallen/files-o-matic/main/hamlet-manifests/hamlet-subject-assistant-example-manifest.json --save-path data/external/prediction_results/results.json --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
+ python scripts/predict_catalog_with_model.py --checkpoint-path data/external/checkpoints/finetuned_zoobot.ckpt --catalog-url https://raw.githubusercontent.com/camallen/files-o-matic/main/hamlet-manifests/hamlet-subject-assistant-example-manifest.json --save-path data/external/prediction_results/results.json --batch-size 3 --num-workers 2 --accelerator cpu --gpus 0
 
 # install and run the tests for the scripts
 pip install pytest # we don't include this in the dockerfile by default as it's not needed for the batch system
