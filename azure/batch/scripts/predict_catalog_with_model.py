@@ -57,7 +57,8 @@ if __name__ == '__main__':
         'batch_size': args.batch_size,
         'num_workers': args.num_workers,
         'prefetch_factor': args.prefetch_factor,
-        'resize_after_crop': 300 
+        # gz evo checkpoint expects 224x224 input image - the following value must align to the encoded value in the model checkpoint!
+        'resize_after_crop': int(os.environ.get('IMAGE_SIZE', '224'))
     }
     trainer_args = {
         'gpus': args.gpus,
