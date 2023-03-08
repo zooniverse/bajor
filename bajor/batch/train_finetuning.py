@@ -206,7 +206,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
     # redirect the stdout to stderr for logging
     promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
-    command = f'/bin/bash -c \"set -ex; python {train_cmd}; {promote_checkpoint_cmd}\"'
+    command = f'/bin/bash -c \"set -ex; PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels python {train_cmd}; {promote_checkpoint_cmd}\"'
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
