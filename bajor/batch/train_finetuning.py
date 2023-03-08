@@ -105,8 +105,9 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
+    setup_pytorch_kernel_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}\"',
+        command_line=f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_dir}; {create_results_dir}; {copy_code_to_shared_dir}\"',
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
@@ -206,7 +207,10 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
     # redirect the stdout to stderr for logging
     promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
-    command = f'/bin/bash -c \"set -ex; PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.kernel_cache python {train_cmd}; {promote_checkpoint_cmd}\"'
+    # ensure pytorch has the correct kernel cach path (this enables CUDA JIT - https://pytorch.org/docs/stable/notes/cuda.html#just-in-time-compilation)
+    setup_pytorch_kernel_cache_env_var = 'PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
+    command = f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_env_var} python {train_cmd}; {promote_checkpoint_cmd}\"'
+
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
