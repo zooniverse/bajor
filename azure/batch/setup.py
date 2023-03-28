@@ -20,6 +20,7 @@ setuptools.setup(
     install_requires=[
         'zoobot[pytorch_cu113] >= 1.0', # the big cheese - bring in the zoobot!
         'requests >= 2.28.1', # used to download prediction images from a remote URL
-        'h5py >= 3.7.0' # used for prediction exports
+        'h5py >= 3.7.0',  # used for prediction exports
+        'honeybadger' # used for error reporting
     ]
 )
