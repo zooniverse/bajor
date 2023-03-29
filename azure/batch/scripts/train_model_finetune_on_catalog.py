@@ -84,7 +84,8 @@ if __name__ == '__main__':
             raise e
 
         from pytorch_lightning.loggers import WandbLogger
-        logger = WandbLogger(project='finetune', name=f'zoobot-bajor-{job_id}')
+        wandb_project_name = os.environ.get('WANDB_PROJECT_NAME', 'finetune-bajor')
+        logger = WandbLogger(project=wandb_project_name, name=f'zoobot-{job_id}')
     else:
         logger = None
 
