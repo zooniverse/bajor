@@ -33,6 +33,12 @@ if __name__ == '__main__':
     parser.add_argument('--devices', default=1, type=int)
     args = parser.parse_args()
 
+    # setup the error reporting tool - https://app.honeybadger.io/projects/
+    honeybadger_api_key = os.getenv('HONEYBADGER_API_KEY')
+    if honeybadger_api_key:
+        from honeybadger import honeybadger
+        honeybadger.configure(api_key=honeybadger_api_key)
+
     logging.info(f'Begin predictions on catalog: {args.catalog_url}')
 
     # load the catalog from a remote JSON url

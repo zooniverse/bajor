@@ -209,7 +209,11 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
     # ensure pytorch has the correct kernel cach path (this enables CUDA JIT - https://pytorch.org/docs/stable/notes/cuda.html#just-in-time-compilation)
     setup_pytorch_kernel_cache_env_var = 'PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
-    command = f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_env_var} python {train_cmd}; {promote_checkpoint_cmd}\"'
+    # add a buffer to wait for the job preparation task to complete as the training task
+    # code is copied down to an executable location in the job preparation task
+    preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '30')
+    wait_for_preparation_task_completion = f'sleep {preparation_task_wait_time}'
+    command = f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_env_var} python {train_cmd}; {promote_checkpoint_cmd}\"'
 
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)

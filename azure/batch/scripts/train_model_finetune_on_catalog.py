@@ -38,6 +38,12 @@ if __name__ == '__main__':
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
     args = parser.parse_args()
 
+    # setup the error reporting tool - https://app.honeybadger.io/projects/
+    honeybadger_api_key = os.getenv('HONEYBADGER_API_KEY')
+    if honeybadger_api_key:
+        from honeybadger import honeybadger
+        honeybadger.configure(api_key=honeybadger_api_key)
+
     # load csv file catalog location into a pandas data frame
     kade_catalog = pd.read_csv(args.catalog_loc)
 
