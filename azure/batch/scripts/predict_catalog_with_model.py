@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # V100 GPU can handle 128 - can look at --mixed-precision opt to decrease the ram use
     parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
-    parser.add_argument('--gpus', default=1, type=int)
+    parser.add_argument('--devices', default=1, type=int)
     args = parser.parse_args()
 
     logging.info(f'Begin predictions on catalog: {args.catalog_url}')
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         'resize_after_crop': int(os.environ.get('IMAGE_SIZE', '224'))
     }
     trainer_args = {
-        'gpus': args.gpus,
+        'devices': args.devices,
         'accelerator': args.accelerator
     }
 
