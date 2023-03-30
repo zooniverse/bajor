@@ -78,7 +78,11 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
             # set the zoobot saved model checkpoint file path
             batchmodels.EnvironmentSetting(
                 name='ZOOBOT_CHECKPOINT_TARGET',
-                value=os.getenv('ZOOBOT_CHECKPOINT_TARGET', 'zoobot.ckpt'))
+                value=os.getenv('ZOOBOT_CHECKPOINT_TARGET', 'zoobot.ckpt')),
+            # setup error reporting service
+            batchmodels.EnvironmentSetting(
+                name='HONEYBADGER_API_KEY',
+                value=os.getenv('HONEYBADGER_API_KEY', ''))
         ],
         # set the on_all_tasks_complete option to 'terminateJob'
         # so the Job's status changes automatically after all submitted tasks are done
