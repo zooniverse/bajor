@@ -23,7 +23,7 @@ from zoobot.shared import save_predictions
 
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
-def requests_retry_session(retries=3, backoff_factor=0.3):
+def requests_retry_session(retries=4, backoff_factor=0.8):
     session = requests.Session()
     retry = Retry(
         total=retries,
