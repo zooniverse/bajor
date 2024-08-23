@@ -95,8 +95,8 @@ def create_batch_job(job_id, manifest_url, pool_id):
         # Short term: avoid waiting for this prep task to complete before starting the main task
         # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.JobPreparationTask?view=azure-python#constructor
         # https://learn.microsoft.com/en-us/azure/batch/batch-job-task-error-checking#job-preparation-tasks
-        wait_for_success=False)
-
+        # wait_for_success=False) # REVERTED: due to failed prediction jobs that can't find data files
+        wait_for_success=True)
 
     # Job release task that runs after the job completes
     # NOTE: job release tasks are hard to debug as you can't easily extract the logs :(
