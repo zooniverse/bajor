@@ -112,6 +112,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
     setup_pytorch_kernel_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_dir}; {create_results_dir}; {copy_code_to_shared_dir}\"',
+        constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
@@ -123,7 +124,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id):
         # Short term: avoid waiting for this prep task to complete before starting the main task
         # https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.JobPreparationTask?view=azure-python#constructor
         # https://learn.microsoft.com/en-us/azure/batch/batch-job-task-error-checking#job-preparation-tasks
-        wait_for_success=False)
+        wait_for_success=True)
 
 
     # Job release task that runs after the job completes
