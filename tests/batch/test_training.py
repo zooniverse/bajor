@@ -40,7 +40,7 @@ def test_schedule_job(mock_create_job_tasks, mock_create_batch_job):
 def test_no_active_jobs(mock_create_job_tasks, mock_create_batch_job):
     train_finetuning.schedule_job(fake_job_id, 'fake-manifest.csv')
     mock_create_batch_job.assert_called_once_with(
-        job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='training_1')
+        job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='training_1', checkpoint_target= 'ZOOBOT_CHECKPOINT_TARGET')
     mock_create_job_tasks.assert_called_once_with(
         job_id=fake_job_id, run_opts='')
 

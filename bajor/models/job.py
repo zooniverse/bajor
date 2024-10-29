@@ -1,10 +1,16 @@
 from pydantic import BaseModel, HttpUrl
+from typing import Optional, Dict
+
+class Options(BaseModel):
+    run_opts: str = ""
+    workflow_name: str = 'cosmic_dawn'
+
 
 class TrainingJob(BaseModel):
     manifest_path: str
-    id: str | None
-    status: str | None
-    run_opts: str = ''
+    id: Optional[str] = None
+    status: Optional[str] =  None
+    opts: Options = Options()
 
     # remove the leading / from the manifest url
     # as it's added via the blob storage paths in schedule_job
@@ -14,6 +20,6 @@ class TrainingJob(BaseModel):
 
 class PredictionJob(BaseModel):
     manifest_url: HttpUrl
-    id: str | None
-    status: str | None
-    run_opts: str = ''
+    id: Optional[str] = None
+    status: Optional[str] =  None
+    opts: Options = Options()

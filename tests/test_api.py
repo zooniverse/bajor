@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 import uuid, os, pytest
 from unittest import mock
+from bajor.env_helpers import training_run_opts
 
 fake_revision = str(uuid.uuid4())
 submitted_job_id = 'fake-job-id'
@@ -69,8 +70,11 @@ def test_batch_scheduling_code_is_called(mocked_client):
     response = mocked_client.post(
         "/training/jobs/",
         auth=('bajor', 'bajor'),
-        json={"manifest_path": "test_manifest_file_path.csv"},
+        json={"manifest_path": "test_manifest_file_path.csv", "opt": { "run_opts": "", "workflow_name": 'cosmic_dawn'}},
     )
+
+    run_opts = f' {training_run_opts()}'
+
     assert response.status_code == 201
     assert response.json() == {
-        'manifest_path': 'test_manifest_file_path.csv', 'id': submitted_job_id, 'run_opts': '', 'status': {"status": "started", "message": "Job submitted successfully"}}
+        'manifest_path': 'test_manifest_file_path.csv', 'id': submitted_job_id, 'opts': {'run_opts': run_opts, 'workflow_name': 'cosmic_dawn'}, 'status': {"status": "started", "message": "Job submitted successfully"}}
