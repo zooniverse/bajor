@@ -9,6 +9,7 @@ import azure.batch.models as batchmodels
 from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
 from bajor.log_config import log
+from bajor.models.job import Options
 
 # Zoobot Azure Batch predictions pool ID
 predictions_pool_id = os.getenv('POOL_ID', 'predictions_0')
@@ -24,17 +25,19 @@ def get_non_active_batch_job_list():
   return batch_jobs.get_non_active_batch_job_list(predictions_pool_id)
 
 # schedule a training job
-def schedule_job(job_id, manifest_url, run_opts=''):
+def schedule_job(job_id:str, manifest_url:str, options:Options=Options()):
+    checkpoint_target = 'EUCLID_ZOOBOT_CHECKPOINT_TARGET' if options.workflow_name == 'euclid' else 'ZOOBOT_CHECKPOINT_TARGET'
+
     submitted_job_id = create_batch_job(
-        job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id)
+        job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id, checkpoint_target=checkpoint_target)
     job_task_submission_status = create_job_tasks(
-        job_id=job_id, run_opts=run_opts)
+        job_id=job_id, run_opts=options.run_opts)
 
     # return the submitted job_id and task submission status dict
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
 
-def create_batch_job(job_id, manifest_url, pool_id):
+def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CHECKPOINT_TARGET'):
     log.debug('server_job, create_batch_job, using manifest at url: {}'.format(manifest_url))
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
@@ -67,7 +70,7 @@ def create_batch_job(job_id, manifest_url, pool_id):
             # set the zoobot saved model checkpoint file path
             batchmodels.EnvironmentSetting(
                 name='ZOOBOT_CHECKPOINT_TARGET',
-                value=os.getenv('ZOOBOT_CHECKPOINT_TARGET', 'zoobot.ckpt')),
+                value=os.getenv(checkpoint_target, 'zoobot.ckpt')),
             # setup error reporting service
             batchmodels.EnvironmentSetting(
                 name='HONEYBADGER_API_KEY',

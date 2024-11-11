@@ -40,9 +40,8 @@ async def create_job(job: TrainingJob, response: Response, authorized: bool = De
       log.debug('No active jobs running - lets get scheduling!')
 
       # allow the env to specify default run opts like --debug on staging
-      run_opts = f'{job.run_opts} {training_run_opts()}'
-
-      results = training.schedule_job(job_id, job.stripped_manifest_path(), run_opts)
+      job.opts.run_opts = f'{job.opts.run_opts} {training_run_opts()}'
+      results = training.schedule_job(job_id, job.stripped_manifest_path(), job.opts)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 

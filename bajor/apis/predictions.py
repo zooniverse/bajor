@@ -38,7 +38,7 @@ async def create_job(job: PredictionJob, response: Response, authorized: bool = 
     else:
       log.debug('No active jobs running - lets get scheduling!')
       results = predictions.schedule_job(
-          job_id, job.manifest_url, job.run_opts)
+          job_id, job.manifest_url, job.opts)
       job.id = results['submitted_job_id']
       job.status = results['job_task_status']
 
