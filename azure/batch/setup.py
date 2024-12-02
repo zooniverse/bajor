@@ -16,9 +16,9 @@ setuptools.setup(
         "Environment :: GPU :: NVIDIA CUDA"
     ],
     packages=setuptools.find_packages(),
-    python_requires=">=3.7",  # tf 2.8.0 requires Python 3.7 and above
+    python_requires=">=3.9",  # tf 2.8.0 requires Python 3.7 and above
     install_requires=[
-        'zoobot[pytorch_cu113] >= 1.0', # the big cheese - bring in the zoobot!
+        'zoobot[pytorch-cu121] >= 2.0.1', # the big cheese - bring in the zoobot!
         'requests >= 2.28.1', # used to download prediction images from a remote URL
         'honeybadger' # used for error reporting
     ]

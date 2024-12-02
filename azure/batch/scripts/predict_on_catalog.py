@@ -64,15 +64,7 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           # ensure we raise other response errors like 404 and 500 etc
           # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
           response.raise_for_status()
-          url_mime_type = response.headers['content-type']
-          # handle PNG images
-          if url_mime_type == 'image/png':
-              # use PIL image to read the png file buffer
-              image = Image.open(response.raw)
-          else: # but assume all other images are JPEG
-              # HWC PIL image
-              image = Image.fromarray(
-                  galaxy_dataset.decode_jpeg(response.raw.read()))
+          image = Image.open(response.raw)
       except Exception as e:
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
@@ -98,7 +90,7 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
 class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
     # override the setup method to setup our prediction dataset on the prediction catalog
     def setup(self, stage: Optional[str] = None):
-        self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.transform)
+        self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.test_transform)
 
 
 def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], label_cols: List[str], save_loc: str):
