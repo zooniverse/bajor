@@ -4,23 +4,23 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /usr/src/zoobot
 
-# Install prerequisites and add deadsnakes PPA for Python 3.9
+# Install prerequisites and add deadsnakes PPA for Python 3.10
 RUN apt-get update && apt-get -y upgrade && \
     apt-get install --no-install-recommends -y \
     software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && apt-get install --no-install-recommends -y \
     build-essential \
-    python3.9 \
-    python3.9-distutils \
-    python3.9-dev \
+    python3.10 \
+    python3.10-distutils \
+    python3.10-dev \
     python3-pip \
     git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Link Python 3.9 as default
-RUN ln -sf /usr/bin/python3.9 /usr/bin/python && \
-    ln -sf /usr/bin/python3.9 /usr/bin/python3
+# Link Python 3.10 as default
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
+    ln -sf /usr/bin/python3.10 /usr/bin/python3
 
 # install a newer version of pip
 # as we can't use the use the ubuntu package pip version (20.0.2)
