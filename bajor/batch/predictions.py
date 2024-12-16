@@ -88,6 +88,12 @@ def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CH
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}\"',
         constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
+        user_identity = batchmodels.UserIdentity(
+           auto_user=batchmodels.AutoUserSpecification(
+              scope=batchmodels.AutoUserScope.task,
+              elevation_level=batchmodels.ElevationLevel.admin
+           )
+        ),
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
