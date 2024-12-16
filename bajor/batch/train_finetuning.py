@@ -123,6 +123,9 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
               elevation_level=batchmodels.ElevationLevel.non_admin
            )
         ),
+        environment_settings=[
+           batchmodels.EnvironmentSetting(name="HF_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/.cache/huggingface"),
+        ],
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
