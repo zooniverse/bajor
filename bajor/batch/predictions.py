@@ -91,7 +91,7 @@ def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CH
         user_identity = batchmodels.UserIdentity(
            auto_user=batchmodels.AutoUserSpecification(
               scope=batchmodels.AutoUserScope.task,
-              elevation_level=batchmodels.ElevationLevel.admin
+              elevation_level=batchmodels.ElevationLevel.non_admin
            )
         ),
         #

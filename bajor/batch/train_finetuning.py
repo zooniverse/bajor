@@ -119,7 +119,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
         user_identity = batchmodels.UserIdentity(
            auto_user=batchmodels.AutoUserSpecification(
               scope=batchmodels.AutoUserScope.task,
-              elevation_level=batchmodels.ElevationLevel.admin
+              elevation_level=batchmodels.ElevationLevel.non_admin
            )
         ),
         #
