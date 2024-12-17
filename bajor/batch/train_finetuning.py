@@ -249,6 +249,16 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
             working_directory='taskWorkingDirectory',
             container_run_options='--ipc=host'
         ),
+        user_identity = batchmodels.UserIdentity(
+           auto_user=batchmodels.AutoUserSpecification(
+              scope=batchmodels.AutoUserScope.task,
+              elevation_level=batchmodels.ElevationLevel.admin
+           )
+        ),
+        environment_settings=[
+           batchmodels.EnvironmentSetting(name="XDG_CACHE_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/huggingface"),
+           batchmodels.EnvironmentSetting(name="HF_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/huggingface"),
+        ],
         output_files=std_err_and_out
     )
     tasks.append(task)
