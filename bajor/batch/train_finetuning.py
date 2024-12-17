@@ -111,7 +111,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
     # this could be used for a task to copy the code from the default storage account to the job directory
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
-    setup_huggingface_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/.cache/huggingface'
+    setup_huggingface_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/huggingface'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     setup_pytorch_kernel_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     job.job_preparation_task = batchmodels.JobPreparationTask(
@@ -124,7 +124,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
            )
         ),
         environment_settings=[
-           batchmodels.EnvironmentSetting(name="HF_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/.cache/huggingface"),
+           batchmodels.EnvironmentSetting(name="XDG_CACHE_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/huggingface"),
         ],
         #
         # A busted preparation task means the main task won't launch...ever!
@@ -228,7 +228,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # ensure pytorch has the correct kernel cach path (this enables CUDA JIT - https://pytorch.org/docs/stable/notes/cuda.html#just-in-time-compilation)
     setup_pytorch_kernel_cache_env_var = 'PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     # Directory for Hugging Face cache
-    setup_hugging_face_cache_env_var = 'HF_HOME=$AZ_BATCH_NODE_SHARED_DIR/.cache/huggingface'
+    setup_hugging_face_cache_env_var = 'XDG_CACHE_HOME=$AZ_BATCH_NODE_SHARED_DIR/huggingface'
     # add a buffer to wait for the job preparation task to complete as the training task
     # code is copied down to an executable location in the job preparation task
     preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '30')
