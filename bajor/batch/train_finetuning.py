@@ -233,7 +233,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     command = (
        '/bin/bash -c "'
        'set -ex; '
-       'nvidia-smi; || echo \\"nvidia-smi command failed\\"; '
+       'nvidia-smi; '
        'python -c \\"import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())\\"; '
        f'{wait_for_preparation_task_completion}; '
        f'{setup_pytorch_kernel_cache_env_var}; '
