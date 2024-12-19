@@ -13,6 +13,7 @@ from bajor.models.job import Options
 
 # Zoobot Azure Batch training pool ID
 training_pool_id = os.getenv('POOL_ID', 'training_1')
+huggingface_dir = '$AZ_BATCH_NODE_SHARED_DIR/.cache/huggingface'
 
 
 # wrapper functions to isolate the jobs to the training pool
@@ -111,21 +112,12 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
     # this could be used for a task to copy the code from the default storage account to the job directory
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
-    setup_huggingface_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/huggingface'
+    setup_huggingface_cache_dir = f'mkdir -p {huggingface_dir}'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     setup_pytorch_kernel_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_dir}; {setup_huggingface_cache_dir}; {create_results_dir}; {copy_code_to_shared_dir}\"',
         constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
-        user_identity = batchmodels.UserIdentity(
-           auto_user=batchmodels.AutoUserSpecification(
-              scope=batchmodels.AutoUserScope.task,
-              elevation_level=batchmodels.ElevationLevel.admin
-           )
-        ),
-        environment_settings=[
-           batchmodels.EnvironmentSetting(name="XDG_CACHE_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/huggingface"),
-        ],
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
@@ -228,16 +220,28 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # ensure pytorch has the correct kernel cach path (this enables CUDA JIT - https://pytorch.org/docs/stable/notes/cuda.html#just-in-time-compilation)
     setup_pytorch_kernel_cache_env_var = 'PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     # Directory for Hugging Face cache
-    setup_hugging_face_cache_env_var = 'XDG_CACHE_HOME=$AZ_BATCH_NODE_SHARED_DIR/huggingface'
+    setup_hugging_face_cache_env_var = f'HF_HOME={huggingface_dir}'
     # add a buffer to wait for the job preparation task to complete as the training task
     # code is copied down to an executable location in the job preparation task
     preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '30')
     wait_for_preparation_task_completion = f'sleep {preparation_task_wait_time}'
-    command = f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_env_var}; {setup_hugging_face_cache_env_var}; python {train_cmd}; {promote_checkpoint_cmd}\"'
+    # command = f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_env_var}; {setup_hugging_face_cache_env_var}; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
+    command = (
+       '/bin/bash -c "'
+       'set -ex; '
+       'nvidia-smi; '
+       'python -c \\"import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())\\"; '
+       f'{wait_for_preparation_task_completion}; '
+       f'{setup_pytorch_kernel_cache_env_var}; '
+       f'{setup_hugging_face_cache_env_var}; '
+       f'python {train_cmd}; '
+       f'{promote_checkpoint_cmd}'
+       '"'
+    )
 
     # create a job task to run the Zoobot training system command via the zoobot docker conatiner
     #
@@ -256,8 +260,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
            )
         ),
         environment_settings=[
-           batchmodels.EnvironmentSetting(name="XDG_CACHE_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/huggingface"),
-           batchmodels.EnvironmentSetting(name="HF_HOME", value="$AZ_BATCH_NODE_SHARED_DIR/huggingface"),
+           batchmodels.EnvironmentSetting(name="HF_HOME", value=huggingface_dir),
         ],
         output_files=std_err_and_out
     )
