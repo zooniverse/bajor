@@ -234,7 +234,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
        '/bin/bash -c "'
        'set -ex; '
        f'{wait_for_preparation_task_completion}; '
-       'nvidia-smi; '
+       'nvidia-smi; || echo \\"nvidia-smi command failed\\"; '
        'python -c \\"import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())\\"; '
        f'{setup_pytorch_kernel_cache_env_var}; '
        f'{setup_hugging_face_cache_env_var}; '
@@ -251,7 +251,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
         container_settings=batchmodels.TaskContainerSettings(
             image_name=os.getenv('CONTAINER_IMAGE_NAME'),
             working_directory='taskWorkingDirectory',
-            container_run_options='--ipc=host --gpus all'
+            container_run_options='--ipc=host'
         ),
         user_identity = batchmodels.UserIdentity(
            auto_user=batchmodels.AutoUserSpecification(
