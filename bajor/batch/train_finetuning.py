@@ -118,6 +118,12 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
     job.job_preparation_task = batchmodels.JobPreparationTask(
         command_line=f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_dir}; {setup_huggingface_cache_dir}; {create_results_dir}; {copy_code_to_shared_dir}\"',
         constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
+        user_identity = batchmodels.UserIdentity(
+           auto_user=batchmodels.AutoUserSpecification(
+              scope=batchmodels.AutoUserScope.task,
+              elevation_level=batchmodels.ElevationLevel.admin
+           )
+        ),
         #
         # A busted preparation task means the main task won't launch...ever!
         # and leave the node in a scaled state costing $$ ££
@@ -225,23 +231,11 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # code is copied down to an executable location in the job preparation task
     preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '30')
     wait_for_preparation_task_completion = f'sleep {preparation_task_wait_time}'
-    # command = f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_env_var}; {setup_hugging_face_cache_env_var}; python {train_cmd}; {promote_checkpoint_cmd}\"'
+    command = f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_env_var}; {setup_hugging_face_cache_env_var}; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)
     # command = '/bin/bash -c \'python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"\' '
-    command = (
-       '/bin/bash -c "'
-       'set -ex; '
-       f'{wait_for_preparation_task_completion}; '
-       'nvidia-smi; '
-       'python -c \\"import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())\\"; '
-       f'{setup_pytorch_kernel_cache_env_var}; '
-       f'{setup_hugging_face_cache_env_var}; '
-       f'python {train_cmd}; '
-       f'{promote_checkpoint_cmd}'
-       '"'
-    )
 
     # create a job task to run the Zoobot training system command via the zoobot docker conatiner
     #
