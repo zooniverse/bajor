@@ -26,7 +26,7 @@ COPY . .
 # Allow installing dev dependencies to run tests
 ARG INSTALL_DEV=false
 
-RUN if [ "${INSTALL_DEV}" = 'true' ]; then poetry install; else poetry install --no-dev; fi
+RUN if [ "${INSTALL_DEV}" = 'true' ]; then poetry install; else poetry install --only main; fi
 
 # start the api
 CMD ["poetry", "run", "start"]
