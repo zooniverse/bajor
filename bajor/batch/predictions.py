@@ -13,6 +13,7 @@ from bajor.models.job import Options
 
 # Zoobot Azure Batch predictions pool ID
 predictions_pool_id = os.getenv('POOL_ID', 'predictions_0')
+huggingface_dir = '$AZ_BATCH_NODE_SHARED_DIR/.cache/huggingface'
 
 # wrapper functions to isolate the jobs to the training pool
 def active_jobs_running():
@@ -84,9 +85,10 @@ def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CH
 
     # job preparation task
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR'
+    setup_huggingface_cache_dir = f'mkdir -p {huggingface_dir}'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {copy_code_to_shared_dir}\"',
+        command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {setup_huggingface_cache_dir}; {copy_code_to_shared_dir}\"',
         constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
         user_identity = batchmodels.UserIdentity(
            auto_user=batchmodels.AutoUserSpecification(
@@ -179,10 +181,11 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # ZOOBOT command for catalogue predictions!
     # see jobPreparation task for code setup
     prediction_code_path = os.getenv('ZOOBOT_PREDICTION_CMD', 'predict_catalog_with_model.py')
+    setup_hugging_face_cache_env_var = f'HF_HOME={huggingface_dir}'
     # TODO: perhaps we can add the output file extension as a job env param that can be modified by job runtime params
     prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{prediction_code_path} {run_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$ZOOBOT_CHECKPOINT_TARGET --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.json'
     # redirect the stdout to stderr for logging
-    command = f'/bin/bash -c \"set -ex; python {prediction_cmd}\"'
+    command = f'/bin/bash -c \"set -ex; {setup_hugging_face_cache_env_var}; python {prediction_cmd}\"'
 
     # create a job task to run the Zoobot training system command via the zoobot docker conatiner
     #
@@ -194,6 +197,15 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
             working_directory='taskWorkingDirectory',
             container_run_options='--ipc=host'
         ),
+        user_identity = batchmodels.UserIdentity(
+           auto_user=batchmodels.AutoUserSpecification(
+              scope=batchmodels.AutoUserScope.task,
+              elevation_level=batchmodels.ElevationLevel.admin
+           )
+        ),
+        environment_settings=[
+           batchmodels.EnvironmentSetting(name="HF_HOME", value=huggingface_dir),
+        ],
         output_files=std_err_and_out
     )
     tasks.append(task)
