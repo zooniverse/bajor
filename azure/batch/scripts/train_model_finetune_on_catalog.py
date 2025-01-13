@@ -23,10 +23,9 @@ if __name__ == '__main__':
     parser.add_argument('--catalog', dest='catalog_loc', type=str, required=True)
     parser.add_argument('--checkpoint', dest='checkpoint', type=str, required=True)
     parser.add_argument('--schema', dest='schema', type=str, default='cosmic_dawn')
-    parser.add_argument('--num-workers', dest='num_workers', type=int, default=11)  # benchmarks show 11 work on our VM types - was int((os.cpu_count())
+    parser.add_argument('--num-workers', dest='num_workers', type=int, default=int(os.cpu_count()))  # benchmarks show 4 work on our VM types - was int((os.cpu_count())
     parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=9) # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
-    # V100 GPU can handle 128 - can look at --mixed-precision opt to decrease the ram use
-    parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
+    parser.add_argument('--batch-size', dest='batch_size', default=10, type=int) # benchmarks show 10 works on our new VM type - was 128 (default)
     parser.add_argument('--accelerator', type=str, default='gpu')
     parser.add_argument('--devices', default=1, type=int)
     parser.add_argument('--progress-bar', dest='progress_bar', action='store_true')
@@ -106,7 +105,8 @@ if __name__ == '__main__':
     model = finetune.FinetuneableZoobotTree(
         # params specific to tree finetuning
         schema=schema,
-        zoobot_checkpoint_loc=args.checkpoint
+        # zoobot_checkpoint_loc=args.checkpoint,
+        name='hf_hub:mwalmsley/zoobot-encoder-convnext_nano'
     )
 
     trainer = finetune.get_trainer(
