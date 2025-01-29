@@ -83,12 +83,16 @@ def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CH
         on_all_tasks_complete=batchmodels.OnAllTasksComplete.terminate_job
     )
 
+    # add a buffer to wait for the mount to complete
+    preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '60')
+    wait_for_preparation_task_completion = f'sleep {preparation_task_wait_time}'
+
     # job preparation task
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR'
     setup_huggingface_cache_dir = f'mkdir -p {huggingface_dir}'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -ex; {create_results_dir}; {setup_huggingface_cache_dir}; {copy_code_to_shared_dir}\"',
+        command_line=f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {create_results_dir}; {setup_huggingface_cache_dir}; {copy_code_to_shared_dir}\"',
         constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
         user_identity = batchmodels.UserIdentity(
            auto_user=batchmodels.AutoUserSpecification(
