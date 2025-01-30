@@ -111,12 +111,16 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
     # NOTE: possible improvement - azure batch has the concept of default (auto) storage accounts that can be used to cp files from/to
     # this could be used for a task to copy the code from the default storage account to the job directory
     # via the ResourceFile arg on tasks, https://learn.microsoft.com/en-us/python/api/azure-batch/azure.batch.models.resourcefile?view=azure-python
+
+    # add a buffer to wait for the mount to complete
+    preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '60')
+    wait_for_preparation_task_completion = f'sleep {preparation_task_wait_time}'
     create_results_dir = f'mkdir -p $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/checkpoints'
     setup_huggingface_cache_dir = f'mkdir -p {huggingface_dir}'
     copy_code_to_shared_dir = 'cp -Rf $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$CODE_DIR_PATH/* $AZ_BATCH_NODE_SHARED_DIR/'
     setup_pytorch_kernel_cache_dir = 'mkdir -p $AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     job.job_preparation_task = batchmodels.JobPreparationTask(
-        command_line=f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_dir}; {setup_huggingface_cache_dir}; {create_results_dir}; {copy_code_to_shared_dir}\"',
+        command_line=f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_dir}; {setup_huggingface_cache_dir}; {create_results_dir}; {copy_code_to_shared_dir}\"',
         constraints=batchmodels.TaskConstraints(max_task_retry_count=3),
         user_identity = batchmodels.UserIdentity(
            auto_user=batchmodels.AutoUserSpecification(
@@ -227,11 +231,8 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     setup_pytorch_kernel_cache_env_var = 'PYTORCH_KERNEL_CACHE_PATH=$AZ_BATCH_NODE_SHARED_DIR/.cache/torch/kernels'
     # Directory for Hugging Face cache
     setup_hugging_face_cache_env_var = f'HF_HOME={huggingface_dir}'
-    # add a buffer to wait for the job preparation task to complete as the training task
     # code is copied down to an executable location in the job preparation task
-    preparation_task_wait_time = os.getenv('PREPARATION_WAIT_TIME', '30')
-    wait_for_preparation_task_completion = f'sleep {preparation_task_wait_time}'
-    command = f'/bin/bash -c \"set -ex; {wait_for_preparation_task_completion}; {setup_pytorch_kernel_cache_env_var}; {setup_hugging_face_cache_env_var}; python {train_cmd}; {promote_checkpoint_cmd}\"'
+    command = f'/bin/bash -c \"set -ex; {setup_pytorch_kernel_cache_env_var}; {setup_hugging_face_cache_env_var}; python {train_cmd}; {promote_checkpoint_cmd}\"'
 
 
     # test the cuda install (there is a built in script for this - https://github.com/mwalmsley/zoobot/blob/048543f21a82e10e7aa36a44bd90c01acd57422a/zoobot/pytorch/estimators/cuda_check.py)

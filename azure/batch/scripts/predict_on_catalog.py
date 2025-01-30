@@ -41,6 +41,11 @@ def requests_retry_session(retries=4, backoff_factor=0.8):
     session.mount('https://', adapter)
     return session
 
+def open_image_as_rgb(img):
+    img = Image.open(img)
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    return img
 
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
   # override the default class implementation for predictions that download from URL
@@ -64,7 +69,7 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           # ensure we raise other response errors like 404 and 500 etc
           # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
           response.raise_for_status()
-          image = Image.open(response.raw)
+          image = open_image_as_rgb(response.raw)
       except Exception as e:
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
