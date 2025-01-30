@@ -105,8 +105,7 @@ if __name__ == '__main__':
     model = finetune.FinetuneableZoobotTree(
         # params specific to tree finetuning
         schema=schema,
-        # zoobot_checkpoint_loc=args.checkpoint,
-        name='hf_hub:mwalmsley/zoobot-encoder-convnext_nano'
+        zoobot_checkpoint_loc=args.checkpoint
     )
 
     trainer = finetune.get_trainer(
