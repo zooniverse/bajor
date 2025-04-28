@@ -1,5 +1,6 @@
 import logging
 import argparse
+import json
 import os
 
 import pandas as pd
@@ -38,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--wandb', default=False, action='store_true')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
     parser.add_argument('--erase_iterations', dest='erase_iterations', type=int, default=0)
-    parser.add_argument('--fixed_crop', dest='fixed_crop', type=dict | None, default=None)
+    parser.add_argument('--fixed_crop', dest='fixed_crop', type=str | None, default=None)
     args = parser.parse_args()
 
     schema_dict = {
@@ -69,11 +70,14 @@ if __name__ == '__main__':
         kade_catalog['file_loc'].iloc[len(kade_catalog.index) - 1]))
 
     transform = None
-    if args.fixed_crop:
-        transform_config = default_view_config()
-        transform_config.erase_iterations = args.erase_iterations
-        transform_config.fixed_crop = args.fixed_crop
-        transform = GalaxyViewTransform(transform_config)
+    try:
+        if args.fixed_crop:
+            transform_config = default_view_config()
+            transform_config.erase_iterations = args.erase_iterations
+            transform_config.fixed_crop = json.loads(args.fixed_crop)
+            transform = GalaxyViewTransform(transform_config)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid fixed_crop JSON: {args.fixed_crop}") from e
 
     datamodule = GalaxyDataModule(
         label_cols=schema.label_cols,
