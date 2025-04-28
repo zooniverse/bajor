@@ -1,7 +1,7 @@
 # training job specific functions
 import logging, os, sys
 
-from bajor.checkpoint_strategies import get_checkpoint_target
+from bajor.batch.checkpoint_strategies import get_checkpoint_target
 
 if os.getenv('DEBUG'):
   import pdb
