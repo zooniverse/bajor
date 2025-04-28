@@ -77,7 +77,7 @@ if __name__ == '__main__':
             transform_config.fixed_crop = json.loads(args.fixed_crop)
             transform = GalaxyViewTransform(transform_config)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid fixed_crop JSON: {args.fixed_crop}") from e
+        logging.error(f"Invalid fixed_crop JSON: {args.fixed_crop}")
 
     datamodule = GalaxyDataModule(
         label_cols=schema.label_cols,
