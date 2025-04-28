@@ -4,6 +4,7 @@ import os
 
 import pandas as pd
 from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
+from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
 from zoobot.pytorch.training import finetune
 from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema
@@ -36,6 +37,8 @@ if __name__ == '__main__':
     parser.add_argument('--patience', default=15, type=int)
     parser.add_argument('--wandb', default=False, action='store_true')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
+    parser.add_argument('--erase_iterations', dest='erase_iterations', type=int, default=0)
+    parser.add_argument('--fixed_crop', dest='fixed_crop', type=dict | None, default=None)
     args = parser.parse_args()
 
     schema_dict = {
@@ -65,12 +68,20 @@ if __name__ == '__main__':
     logging.info('Last file_loc {}'.format(
         kade_catalog['file_loc'].iloc[len(kade_catalog.index) - 1]))
 
+    transform = None
+    if args.fixed_crop:
+        transform_config = default_view_config()
+        transform_config.erase_iterations = args.erase_iterations
+        transform_config.fixed_crop = args.fixed_crop
+        transform = GalaxyViewTransform(transform_config)
+
     datamodule = GalaxyDataModule(
         label_cols=schema.label_cols,
         catalog=kade_catalog,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         prefetch_factor=args.prefetch_factor,
+        custom_torchvision_transform=transform,
         # gz evo checkpoint expects 224x224 input image - the following value must align to the encoded value in the model checkpoint!
         resize_after_crop=int(os.environ.get('IMAGE_SIZE', '224'))
         # uses default_args

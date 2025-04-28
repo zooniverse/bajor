@@ -4,6 +4,7 @@ from typing import Optional, Dict
 class Options(BaseModel):
     run_opts: str = ""
     workflow_name: str = 'cosmic_dawn'
+    fixed_crop: dict | None = None
 
 
 class TrainingJob(BaseModel):

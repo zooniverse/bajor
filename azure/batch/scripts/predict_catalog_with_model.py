@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 from zoobot.pytorch.training import finetune
 import predict_on_catalog
 from galaxy_datasets.shared import label_metadata
+from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
 def load_model_from_checkpoint(checkpoint_path):
     logging.info('Returning model from checkpoint: {}'.format(checkpoint_path))
@@ -31,6 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', dest='batch_size', default=128, type=int)
     parser.add_argument('--accelerator', type=str, default='gpu')
     parser.add_argument('--devices', default=1, type=int)
+    parser.add_argument('--erase_iterations', dest='erase_iterations', type=int, default=0)
+    parser.add_argument('--fixed_crop', dest='fixed_crop', type=dict | None, default=None)
     args = parser.parse_args()
 
     # setup the error reporting tool - https://app.honeybadger.io/projects/
@@ -57,6 +60,13 @@ if __name__ == '__main__':
 
     model = load_model_from_checkpoint(args.checkpoint_path)
 
+    transform = None
+    if args.fixed_crop:
+        transform_config = default_view_config()
+        transform_config.erase_iterations = args.erase_iterations
+        transform_config.fixed_crop = args.fixed_crop
+        transform = GalaxyViewTransform(transform_config)
+
     # provide a way to augment the datamodule and trainer default configs
     # used for testing on local dev machine
     datamodule_args = {
@@ -64,7 +74,8 @@ if __name__ == '__main__':
         'num_workers': args.num_workers,
         'prefetch_factor': args.prefetch_factor,
         # gz evo checkpoint expects 224x224 input image - the following value must align to the encoded value in the model checkpoint!
-        'resize_after_crop': int(os.environ.get('IMAGE_SIZE', '224'))
+        'resize_after_crop': int(os.environ.get('IMAGE_SIZE', '224')),
+        'custom_torchvision_transform': transform
     }
     trainer_args = {
         'devices': args.devices,

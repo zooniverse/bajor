@@ -1,6 +1,8 @@
 # training job specific functions
 import logging, os, sys
 
+from bajor.checkpoint_strategies import get_checkpoint_target
+
 if os.getenv('DEBUG'):
   import pdb
 
@@ -28,7 +30,7 @@ def get_non_active_batch_job_list():
 
 # schedule a training job
 def schedule_job(job_id: str, manifest_path:str, options: Options=Options()):
-    checkpoint_target = 'EUCLID_ZOOBOT_CHECKPOINT_TARGET' if options.workflow_name == 'euclid' else 'ZOOBOT_CHECKPOINT_TARGET'
+    checkpoint_target = get_checkpoint_target(options.workflow_name)
 
     submitted_job_id = create_batch_job(
         job_id=job_id, manifest_container_path=manifest_path, pool_id=training_pool_id, checkpoint_target=checkpoint_target)
