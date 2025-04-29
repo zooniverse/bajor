@@ -8,7 +8,7 @@ from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
 from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
 from zoobot.pytorch.training import finetune
-from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema
+from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema, gz_jwst_schema
 
 if __name__ == '__main__':
 
@@ -39,12 +39,13 @@ if __name__ == '__main__':
     parser.add_argument('--wandb', default=False, action='store_true')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
     parser.add_argument('--erase_iterations', dest='erase_iterations', type=int, default=0)
-    parser.add_argument('--fixed_crop', dest='fixed_crop', type=str | None, default=None)
+    parser.add_argument('--fixed-crop', dest='fixed_crop', type=str, default=None)
     args = parser.parse_args()
 
     schema_dict = {
         'cosmic_dawn': cosmic_dawn_ortho_schema,
-        'euclid': euclid_ortho_schema
+        'euclid': euclid_ortho_schema,
+        'jwst_cosmos': gz_jwst_schema
     }
     schema = schema_dict.get(args.schema, cosmic_dawn_ortho_schema)
     # setup the error reporting tool - https://app.honeybadger.io/projects/
