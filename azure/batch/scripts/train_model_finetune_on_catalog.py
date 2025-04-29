@@ -38,7 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--patience', default=15, type=int)
     parser.add_argument('--wandb', default=False, action='store_true')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
-    parser.add_argument('--erase_iterations', dest='erase_iterations', type=int, default=0)
+    parser.add_argument('--erase-iterations', dest='erase_iterations', type=int, default=0)
     parser.add_argument('--fixed-crop', dest='fixed_crop', type=str, default=None)
     args = parser.parse_args()
 
