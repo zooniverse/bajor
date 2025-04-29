@@ -1,12 +1,14 @@
 import logging
 import argparse
+import json
 import os
 
 import pandas as pd
 from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
+from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
 from zoobot.pytorch.training import finetune
-from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema
+from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema, gz_jwst_schema
 
 if __name__ == '__main__':
 
@@ -36,11 +38,14 @@ if __name__ == '__main__':
     parser.add_argument('--patience', default=15, type=int)
     parser.add_argument('--wandb', default=False, action='store_true')
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
+    parser.add_argument('--erase-iterations', dest='erase_iterations', type=int, default=0)
+    parser.add_argument('--fixed-crop', dest='fixed_crop', type=str, default=None)
     args = parser.parse_args()
 
     schema_dict = {
         'cosmic_dawn': cosmic_dawn_ortho_schema,
-        'euclid': euclid_ortho_schema
+        'euclid': euclid_ortho_schema,
+        'jwst_cosmos': gz_jwst_schema
     }
     schema = schema_dict.get(args.schema, cosmic_dawn_ortho_schema)
     # setup the error reporting tool - https://app.honeybadger.io/projects/
@@ -65,12 +70,23 @@ if __name__ == '__main__':
     logging.info('Last file_loc {}'.format(
         kade_catalog['file_loc'].iloc[len(kade_catalog.index) - 1]))
 
+    transform = None
+    try:
+        if args.fixed_crop:
+            transform_config = default_view_config()
+            transform_config.erase_iterations = args.erase_iterations
+            transform_config.fixed_crop = json.loads(args.fixed_crop)
+            transform = GalaxyViewTransform(transform_config)
+    except json.JSONDecodeError as e:
+        logging.error(f"Invalid fixed_crop JSON: {args.fixed_crop}")
+
     datamodule = GalaxyDataModule(
         label_cols=schema.label_cols,
         catalog=kade_catalog,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         prefetch_factor=args.prefetch_factor,
+        custom_torchvision_transform=transform,
         # gz evo checkpoint expects 224x224 input image - the following value must align to the encoded value in the model checkpoint!
         resize_after_crop=int(os.environ.get('IMAGE_SIZE', '224'))
         # uses default_args
