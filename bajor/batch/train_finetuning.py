@@ -1,5 +1,6 @@
 # training job specific functions
 import logging, os, sys
+import shlex
 
 from bajor.batch.checkpoint_strategies import get_checkpoint_target
 
@@ -224,7 +225,8 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # checkpoint file is the base model for finetuning (transfer learning)
     checkpoint_file = os.getenv('ZOOBOT_FINETUNE_CHECKPOINT_FILE', 'zoobot_pretrained_model.ckpt')
     # setup the training cmd
-    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {run_opts} --checkpoint $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/{checkpoint_file} --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/'
+    escaped_opts = shlex.quote(run_opts)
+    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {escaped_opts} --checkpoint $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/{checkpoint_file} --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/'
     # and a way to promote the resulting model artifact for use in prediction systems
     promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
     # redirect the stdout to stderr for logging
