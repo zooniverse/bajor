@@ -1,6 +1,5 @@
 # training job specific functions
 import logging, os, sys
-import shlex
 
 from bajor.batch.checkpoint_strategies import get_checkpoint_target
 
