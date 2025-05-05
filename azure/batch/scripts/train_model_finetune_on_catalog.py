@@ -9,7 +9,7 @@ from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
 from zoobot.pytorch.training import finetune
 from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema, gz_jwst_schema
-
+from train_on_catalog import TrainingGalaxyDataModule
 if __name__ == '__main__':
 
     logging.basicConfig(
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     except json.JSONDecodeError as e:
         logging.error(f"Invalid fixed_crop JSON: {args.fixed_crop}")
 
-    datamodule = GalaxyDataModule(
+    datamodule = TrainingGalaxyDataModule(
         label_cols=schema.label_cols,
         catalog=kade_catalog,
         batch_size=args.batch_size,
