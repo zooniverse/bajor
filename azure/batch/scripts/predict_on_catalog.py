@@ -4,12 +4,16 @@ import time
 import datetime
 from typing import List, Optional
 import json
+from requests.exceptions import HTTPError
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+import io
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -20,7 +24,19 @@ import torch
 from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
 # See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
 from zoobot.shared import save_predictions
+from torch.utils.data.dataloader import default_collate
+from torch.utils.data import DataLoader
 
+# in-memory cache for downloaded image
+@lru_cache(maxsize=None)
+def _fetch_image_bytes(url: str) -> bytes:
+    resp = requests_retry_session().get(url, timeout=5)
+    resp.raise_for_status()
+    return resp.content
+
+def open_cached_image(url: str) -> Image.Image:
+    data = _fetch_image_bytes(url)
+    return open_image_as_rgb(io.BytesIO(data))
 
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
@@ -48,6 +64,19 @@ def open_image_as_rgb(img):
         img = img.convert('RGB')
     return img
 
+def url_ok(url):
+    try:
+        # use cached fetch to both test and cache image bytes
+        _ = _fetch_image_bytes(url)
+        return True
+    except HTTPError as err:
+        if err.response is not None and err.response.status_code == 404:
+            return False
+        raise
+    except Exception:
+        logging.warning(f"Couldn’t fetch {url}; dropping it.")
+        return False
+
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
   # override the default class implementation for predictions that download from URL
   def __init__(self, catalog: pd.DataFrame, label_cols=None, transform=None, target_transform=None):
@@ -57,6 +86,12 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       self.transform = transform
       self.target_transform = target_transform
 
+      catalog_mask = catalog['image_url'].apply(url_ok)
+      if not catalog_mask.all():
+          ids_to_drop = catalog.loc[~catalog_mask, 'subject_id'].tolist()
+          logging.warning(f"Dropping {len(ids_to_drop)} subjects with 404 images: {ids_to_drop}")
+      # only keep the the rows with valid images
+      self.catalog = catalog.loc[catalog_mask].reset_index(drop=True)
 
   def __getitem__(self, idx):
       galaxy = self.catalog.iloc[idx]
@@ -65,12 +100,8 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       try:
           # streaming the file as it is used (saves on memory)
           logging.debug('Downloading url: {}'.format(url))
-          # use retries on requests if we have flaky networks
-          response = requests_retry_session().get(url, stream=True)
-          # ensure we raise other response errors like 404 and 500 etc
-          # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
-          response.raise_for_status()
-          image = open_image_as_rgb(response.raw)
+          # open cached image
+          image = open_cached_image(url)
       except Exception as e:
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
@@ -207,9 +238,6 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
 
 # note - this is pretty much a copy of zoobot code, it might be possible to just import it
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
-    # extract the uniq image identifiers
-    image_id_strs = list(catalog['subject_id'])
-
     predict_datamodule = PredictionGalaxyDataModule(
         label_cols=None, # we don't need the labels for predictions
         predict_catalog=catalog,  # no need to specify the other catalogs
@@ -220,6 +248,9 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
 
     # setup the preduction catalog - specify the stage, or will error (as missing other catalogs)
     predict_datamodule.setup(stage='predict')
+
+    # extract the uniq image identifiers
+    image_id_strs = list(predict_datamodule.predict_dataset.catalog['subject_id'])
 
     # set up trainer (again)
     trainer = pl.Trainer(
