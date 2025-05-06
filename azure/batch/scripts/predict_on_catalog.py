@@ -4,16 +4,12 @@ import time
 import datetime
 from typing import List, Optional
 import json
-from requests.exceptions import HTTPError
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-import io
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -24,19 +20,6 @@ import torch
 from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
 # See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
 from zoobot.shared import save_predictions
-from torch.utils.data.dataloader import default_collate
-from torch.utils.data import DataLoader
-
-# in-memory cache for downloaded image
-@lru_cache(maxsize=None)
-def _fetch_image_bytes(url: str) -> bytes:
-    resp = requests_retry_session().get(url, timeout=5)
-    resp.raise_for_status()
-    return resp.content
-
-def open_cached_image(url: str) -> Image.Image:
-    data = _fetch_image_bytes(url)
-    return open_image_as_rgb(io.BytesIO(data))
 
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
@@ -50,7 +33,7 @@ def requests_retry_session(retries=4, backoff_factor=0.8):
         # use the following to force a retry on the following HTTP response status codes
         # https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
         # server error or connection problems to the origin server
-        status_forcelist=(104, 429, 500, 502, 503, 504)
+        status_forcelist=(104, 429, 500, 502, 503, 504, 404)
     )
     adapter = HTTPAdapter(max_retries=retry)
     # should only have https scheme but let's be safe here
@@ -66,15 +49,10 @@ def open_image_as_rgb(img):
 
 def url_ok(url):
     try:
-        # use cached fetch to both test and cache image bytes
-        _ = _fetch_image_bytes(url)
-        return True
-    except HTTPError as err:
-        if err.response is not None and err.response.status_code == 404:
-            return False
-        raise
+        resp = requests_retry_session().head(url, timeout=5)
+        return resp.status_code != 404
     except Exception:
-        logging.warning(f"Couldn’t fetch {url}; dropping it.")
+        logging.warning(f"Couldn't HEAD {url}; dropping it.")
         return False
 
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
@@ -100,8 +78,12 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       try:
           # streaming the file as it is used (saves on memory)
           logging.debug('Downloading url: {}'.format(url))
-          # open cached image
-          image = open_cached_image(url)
+          # use retries on requests if we have flaky networks
+          response = requests_retry_session().get(url, stream=True)
+          # ensure we raise other response errors like 404 and 500 etc
+          # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
+          response.raise_for_status()
+          image = open_image_as_rgb(response.raw)
       except Exception as e:
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
