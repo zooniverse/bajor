@@ -8,7 +8,8 @@ import json
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,6 @@ import torch
 from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
 # See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
 from zoobot.shared import save_predictions
-
 
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
@@ -33,7 +33,7 @@ def requests_retry_session(retries=4, backoff_factor=0.8):
         # use the following to force a retry on the following HTTP response status codes
         # https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
         # server error or connection problems to the origin server
-        status_forcelist=(104, 429, 500, 502, 503, 504)
+        status_forcelist=(104, 429, 500, 502, 503, 504, 404)
     )
     adapter = HTTPAdapter(max_retries=retry)
     # should only have https scheme but let's be safe here
@@ -47,6 +47,14 @@ def open_image_as_rgb(img):
         img = img.convert('RGB')
     return img
 
+def url_ok(url):
+    try:
+        resp = requests_retry_session().head(url, timeout=5)
+        return resp.status_code != 404
+    except Exception:
+        logging.warning(f"Couldn't HEAD {url}; dropping it.")
+        return False
+
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
   # override the default class implementation for predictions that download from URL
   def __init__(self, catalog: pd.DataFrame, label_cols=None, transform=None, target_transform=None):
@@ -56,6 +64,12 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       self.transform = transform
       self.target_transform = target_transform
 
+      catalog_mask = catalog['image_url'].apply(url_ok)
+      if not catalog_mask.all():
+          ids_to_drop = catalog.loc[~catalog_mask, 'subject_id'].tolist()
+          logging.warning(f"Dropping {len(ids_to_drop)} subjects with 404 images: {ids_to_drop}")
+      # only keep the the rows with valid images
+      self.catalog = catalog.loc[catalog_mask].reset_index(drop=True)
 
   def __getitem__(self, idx):
       galaxy = self.catalog.iloc[idx]
@@ -206,9 +220,6 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
 
 # note - this is pretty much a copy of zoobot code, it might be possible to just import it
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
-    # extract the uniq image identifiers
-    image_id_strs = list(catalog['subject_id'])
-
     predict_datamodule = PredictionGalaxyDataModule(
         label_cols=None, # we don't need the labels for predictions
         predict_catalog=catalog,  # no need to specify the other catalogs
@@ -219,6 +230,9 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
 
     # setup the preduction catalog - specify the stage, or will error (as missing other catalogs)
     predict_datamodule.setup(stage='predict')
+
+    # extract the uniq image identifiers
+    image_id_strs = list(predict_datamodule.predict_dataset.catalog['subject_id'])
 
     # set up trainer (again)
     trainer = pl.Trainer(
