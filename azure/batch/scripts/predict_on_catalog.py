@@ -33,7 +33,7 @@ def requests_retry_session(retries=4, backoff_factor=0.8):
         # use the following to force a retry on the following HTTP response status codes
         # https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
         # server error or connection problems to the origin server
-        status_forcelist=(104, 429, 500, 502, 503, 504, 404)
+        status_forcelist=(104, 429, 500, 502, 503, 504)
     )
     adapter = HTTPAdapter(max_retries=retry)
     # should only have https scheme but let's be safe here
@@ -47,14 +47,6 @@ def open_image_as_rgb(img):
         img = img.convert('RGB')
     return img
 
-def url_ok(url):
-    try:
-        resp = requests_retry_session().head(url, timeout=5)
-        return resp.status_code != 404
-    except Exception:
-        logging.warning(f"Couldn't HEAD {url}; dropping it.")
-        return False
-
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
   # override the default class implementation for predictions that download from URL
   def __init__(self, catalog: pd.DataFrame, label_cols=None, transform=None, target_transform=None):
@@ -63,13 +55,6 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       self.label_cols = label_cols
       self.transform = transform
       self.target_transform = target_transform
-
-      catalog_mask = catalog['image_url'].apply(url_ok)
-      if not catalog_mask.all():
-          ids_to_drop = catalog.loc[~catalog_mask, 'subject_id'].tolist()
-          logging.warning(f"Dropping {len(ids_to_drop)} subjects with 404 images: {ids_to_drop}")
-      # only keep the the rows with valid images
-      self.catalog = catalog.loc[catalog_mask].reset_index(drop=True)
 
   def __getitem__(self, idx):
       galaxy = self.catalog.iloc[idx]
@@ -232,7 +217,7 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     predict_datamodule.setup(stage='predict')
 
     # extract the uniq image identifiers
-    image_id_strs = list(predict_datamodule.predict_dataset.catalog['subject_id'])
+    image_id_strs = list(catalog['subject_id'])
 
     # set up trainer (again)
     trainer = pl.Trainer(
