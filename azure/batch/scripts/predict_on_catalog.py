@@ -50,46 +50,46 @@ def open_image_as_rgb(img):
 class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
   # override the default class implementation for predictions that download from URL
   def __init__(self, catalog: pd.DataFrame, label_cols=None, transform=None, target_transform=None):
-      self.catalog = catalog
-
       self.label_cols = label_cols
       self.transform = transform
       self.target_transform = target_transform
 
+      self.data = []
+      valid_rows = []
+      for _, row in catalog.iterrows():
+          try:
+              # streaming the file as it is used (saves on memory)
+              logging.debug('Downloading url: {}'.format(row.image_url))
+              # use retries on requests if we have flaky networks
+              response = requests_retry_session().get(row.image_url, stream=True, timeout=5)
+              # ensure we raise other response errors like 404 and 500 etc
+              # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
+              response.raise_for_status()
+              image = open_image_as_rgb(response.raw)
+              # avoid the label lookups as they aren't used in the prediction
+              label = []
+
+              # logging.info((image.shape, torch.max(image), image.dtype, label))  # always 0-255 uint8
+              if self.transform:
+                  # a CHW tensor, which torchvision wants. May change to PIL image.
+                  image = self.transform(image)
+
+              if self.target_transform:
+                  label = self.target_transform(label)
+
+              #append to valid rows and data
+              valid_rows.append(row)
+              self.data.append(image)
+
+          except Exception as e:
+              logging.critical(f"Cannot prefetch {row.image_url}, skipping: {e}")
+              # if prefetching fails, don't add the row and continue
+              continue
+
+      self.catalog = pd.DataFrame(valid_rows).reset_index(drop=True)
+
   def __getitem__(self, idx):
-      galaxy = self.catalog.iloc[idx]
-      # load the data from the remote image URL
-      url = galaxy['image_url']
-      try:
-          # streaming the file as it is used (saves on memory)
-          logging.debug('Downloading url: {}'.format(url))
-          # use retries on requests if we have flaky networks
-          response = requests_retry_session().get(url, stream=True)
-          # ensure we raise other response errors like 404 and 500 etc
-          # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
-          response.raise_for_status()
-          image = open_image_as_rgb(response.raw)
-      except Exception as e:
-          # add some logging on the failed url
-          logging.critical('Cannot load {}'.format(url))
-          # and make sure we reraise the error
-          raise e
-
-      # avoid the label lookups as they aren't used in the prediction
-      label = []
-
-      # logging.info((image.shape, torch.max(image), image.dtype, label))  # always 0-255 uint8
-
-      if self.transform:
-          # a CHW tensor, which torchvision wants. May change to PIL image.
-          image = self.transform(image)
-
-      if self.target_transform:
-          label = self.target_transform(label)
-
-      # logging.info((image.shape, torch.max(image), image.dtype, label))  #  should be 0-1 float
-      return image
-
+    return self.data[idx]
 
 class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
     # override the setup method to setup our prediction dataset on the prediction catalog
@@ -217,7 +217,7 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     predict_datamodule.setup(stage='predict')
 
     # extract the uniq image identifiers
-    image_id_strs = list(catalog['subject_id'])
+    image_id_strs = list(predict_datamodule.predict_dataset.catalog['subject_id'])
 
     # set up trainer (again)
     trainer = pl.Trainer(
