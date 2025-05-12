@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', dest='debug', default=False, action='store_true')
     parser.add_argument('--erase-iterations', dest='erase_iterations', type=int, default=0)
     parser.add_argument('--fixed-crop', dest='fixed_crop', type=str, default=None)
+    parser.add_argument('--n-blocks', dest='n_blocks', type=int, default=0)
     args = parser.parse_args()
 
     schema_dict = {
@@ -121,6 +122,7 @@ if __name__ == '__main__':
     model = finetune.FinetuneableZoobotTree(
         # params specific to tree finetuning
         schema=schema,
+        n_blocks=args.n_blocks,
         # zoobot_checkpoint_loc=args.checkpoint
         name='hf_hub:mwalmsley/zoobot-encoder-convnext_nano'
     )
