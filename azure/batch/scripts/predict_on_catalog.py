@@ -4,6 +4,7 @@ import time
 import datetime
 from typing import List, Optional
 import json
+import types
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -20,7 +21,7 @@ import torch
 from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
 # See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
 from zoobot.shared import save_predictions
-
+from torch.utils.data import DataLoader
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
 def requests_retry_session(retries=4, backoff_factor=0.8):
@@ -60,6 +61,7 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
       galaxy = self.catalog.iloc[idx]
       # load the data from the remote image URL
       url = galaxy['image_url']
+      subject_id = galaxy['subject_id']
       try:
           # streaming the file as it is used (saves on memory)
           logging.debug('Downloading url: {}'.format(url))
@@ -73,7 +75,7 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
           # and make sure we reraise the error
-          raise e
+          return None
 
       # avoid the label lookups as they aren't used in the prediction
       label = []
@@ -88,13 +90,33 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           label = self.target_transform(label)
 
       # logging.info((image.shape, torch.max(image), image.dtype, label))  #  should be 0-1 float
-      return image
+      return image, subject_id
 
+def collate_fn(batch):
+    batch = [b for b in batch if b is not None]
+    if not batch:
+        return None
+    images, ids = zip(*batch)
+    images = torch.utils.data.dataloader.default_collate(images)
+    return images, list(ids)
 
 class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
     # override the setup method to setup our prediction dataset on the prediction catalog
     def setup(self, stage: Optional[str] = None):
         self.predict_dataset = PredictionGalaxyDataset(catalog=self.predict_catalog, transform=self.test_transform)
+
+    def predict_dataloader(self):
+        return DataLoader(
+            self.predict_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=self.num_workers > 0,
+            prefetch_factor=self.prefetch_factor,
+            timeout=self.dataloader_timeout,
+            collate_fn=collate_fn,
+        )
 
 
 def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], label_cols: List[str], save_loc: str):
@@ -203,7 +225,7 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 
-# note - this is pretty much a copy of zoobot code, it might be possible to just import it
+# note - this is pretty much a copy of zoobot code, it might be possible to just import it(also overrides the model predict_step to process subject ids)
 def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
     predict_datamodule = PredictionGalaxyDataModule(
         label_cols=None, # we don't need the labels for predictions
@@ -216,9 +238,6 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     # setup the preduction catalog - specify the stage, or will error (as missing other catalogs)
     predict_datamodule.setup(stage='predict')
 
-    # extract the uniq image identifiers
-    image_id_strs = list(catalog['subject_id'])
-
     # set up trainer (again)
     trainer = pl.Trainer(
         max_epochs=-1,  # does nothing in this context, suppresses warning
@@ -230,14 +249,31 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     start = datetime.datetime.fromtimestamp(time.time())
     logging.info('Starting at: {}'.format(start.strftime('%Y-%m-%d %H:%M:%S')))
 
+    # monkey-patch predict_step to return both predictions and subject ids
+    def _predict_step(self, batch, batch_idx, dataloader_idx=0):
+        images, ids = batch
+        predictions = self(images)
+        return {"predictions": predictions, "subject_ids": ids}
+
+    model.predict_step = types.MethodType(_predict_step, model)
+
     # derive the predictions
     predictions = trainer.predict(model, predict_datamodule)
+
+    batch_predictions = [prediction["predictions"] for prediction in predictions]
+    batch_ids   = [prediction["subject_ids"]   for prediction in predictions]
     logging.info(len(predictions))
 
     # trainer.predict gives list of tensors, each tensor being predictions for a batch. Concat on axis 0.
     # range(n_samples) list comprehension repeats this, for dropout-permuted predictions. Stack to create new last axis.
     # final shape (n_galaxies, n_answers, n_samples)
-    predictions = torch.stack([torch.concat(predictions, dim=0) for n in range(n_samples)], dim=2).numpy()
+    predictions = torch.stack([torch.concat(batch_predictions, dim=0) for n in range(n_samples)], dim=2).numpy()
+
+    # extract the uniq image identifiers
+    image_id_strs = []
+    for batch in batch_ids:
+        for subject_id in batch:
+            image_id_strs.append(subject_id)
 
     logging.info('Predictions complete - {}'.format(predictions.shape))
     logging.info(f'Saving predictions to {save_loc}')
