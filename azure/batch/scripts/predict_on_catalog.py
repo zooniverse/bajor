@@ -22,6 +22,8 @@ from galaxy_datasets.pytorch import galaxy_dataset, galaxy_datamodule
 # See https://github.com/mwalmsley/zoobot/blob/main/zoobot/shared/save_predictions.py
 from zoobot.shared import save_predictions
 from torch.utils.data import DataLoader
+from io import BytesIO
+
 # add retries on requests if we have flaky networks
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
 def requests_retry_session(retries=4, backoff_factor=0.8):
@@ -42,8 +44,8 @@ def requests_retry_session(retries=4, backoff_factor=0.8):
     session.mount('https://', adapter)
     return session
 
-def open_image_as_rgb(img):
-    img = Image.open(img)
+def open_image_as_rgb(raw_bytes):
+    img = Image.open(BytesIO(raw_bytes))
     if img.mode != 'RGB':
         img = img.convert('RGB')
     return img
@@ -70,7 +72,7 @@ class PredictionGalaxyDataset(galaxy_dataset.GalaxyDataset):
           # ensure we raise other response errors like 404 and 500 etc
           # Note: we don't retry on errors that aren't in the `status_forcelist`, instead we fast fail!
           response.raise_for_status()
-          image = open_image_as_rgb(response.raw)
+          image = open_image_as_rgb(response.content)
       except Exception as e:
           # add some logging on the failed url
           logging.critical('Cannot load {}'.format(url))
