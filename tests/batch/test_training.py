@@ -1,8 +1,10 @@
 import bajor.batch.train_from_scratch as train_from_scratch
 import bajor.batch.train_finetuning as train_finetuning
+import bajor.batch.predictions as predictions
 from bajor.batch.jobs import active_jobs_running
 import uuid, os
 from unittest import mock
+from bajor.models.job import Options
 
 fake_job_id = str(uuid.uuid4())
 test_pool = 'pool'
@@ -40,9 +42,9 @@ def test_schedule_job(mock_create_job_tasks, mock_create_batch_job):
 def test_no_active_jobs(mock_create_job_tasks, mock_create_batch_job):
     train_finetuning.schedule_job(fake_job_id, 'fake-manifest.csv')
     mock_create_batch_job.assert_called_once_with(
-        job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='training_1', checkpoint_target= 'ZOOBOT_CHECKPOINT_TARGET')
+        job_id=fake_job_id, manifest_container_path='fake-manifest.csv', pool_id='training_1', options=Options())
     mock_create_job_tasks.assert_called_once_with(
-        job_id=fake_job_id, run_opts='')
+        job_id=fake_job_id, options=Options())
 
 
 @mock.patch('bajor.batch.train_finetuning.create_batch_job')
@@ -58,3 +60,22 @@ def test_schedule_job(mock_create_job_tasks, mock_create_batch_job):
     result_dict = train_finetuning.schedule_job(
         submitted_job_id, 'fake-manifest-path.csv')
     assert(result_dict) == expected_result_dict
+
+
+@mock.patch('bajor.batch.predictions.create_batch_job')
+@mock.patch('bajor.batch.predictions.create_job_tasks')
+def test_prediction_schedule_job_uses_options(mock_create_job_tasks, mock_create_batch_job):
+    options = Options(
+        prediction_script_path='predict_catalog_with_model.py',
+        pretrained_checkpoint_url='custom.ckpt'
+    )
+
+    predictions.schedule_job(fake_job_id, 'https://manifest-host/predictions.json', options)
+
+    mock_create_batch_job.assert_called_once_with(
+        job_id=fake_job_id,
+        manifest_url='https://manifest-host/predictions.json',
+        pool_id='predictions_0',
+        options=options
+    )
+    mock_create_job_tasks.assert_called_once_with(job_id=fake_job_id, options=options)

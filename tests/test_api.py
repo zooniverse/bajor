@@ -77,4 +77,16 @@ def test_batch_scheduling_code_is_called(mocked_client):
 
     assert response.status_code == 201
     assert response.json() == {
-        'manifest_path': 'test_manifest_file_path.csv', 'id': submitted_job_id, 'opts': {'run_opts': run_opts, 'workflow_name': 'cosmic_dawn'}, 'status': {"status": "started", "message": "Job submitted successfully"}}
+        'manifest_path': 'test_manifest_file_path.csv',
+        'id': submitted_job_id,
+        'opts': {
+            'run_opts': run_opts,
+            'workflow_name': 'cosmic_dawn',
+            'container_image_name': None,
+            'training_script_path': None,
+            'prediction_script_path': None,
+            'promote_script_path': None,
+            'pretrained_checkpoint_url': None
+        },
+        'status': {"status": "started", "message": "Job submitted successfully"}
+    }

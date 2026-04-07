@@ -1,7 +1,13 @@
 # training job specific functions
 import logging, os, sys
 
-from bajor.batch.checkpoint_strategies import get_checkpoint_target
+from bajor.batch.runtime_config import (
+    resolve_container_image_name,
+    resolve_checkpoint_target,
+    resolve_pretrained_checkpoint_path,
+    resolve_promote_script_path,
+    resolve_training_script_path,
+)
 
 if os.getenv('DEBUG'):
   import pdb
@@ -30,19 +36,19 @@ def get_non_active_batch_job_list():
 
 # schedule a training job
 def schedule_job(job_id: str, manifest_path:str, options: Options=Options()):
-    checkpoint_target = get_checkpoint_target(options.workflow_name)
-
     submitted_job_id = create_batch_job(
-        job_id=job_id, manifest_container_path=manifest_path, pool_id=training_pool_id, checkpoint_target=checkpoint_target)
+        job_id=job_id, manifest_container_path=manifest_path, pool_id=training_pool_id, options=options)
     job_task_submission_status = create_job_tasks(
-        job_id=job_id, run_opts=options.run_opts)
+        job_id=job_id, options=options)
 
     # return the submitted job_id and task submission status dict
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
-def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target='ZOOBOT_CHECKPOINT_TARGET'):
+def create_batch_job(job_id, manifest_container_path, pool_id, options: Options=Options()):
     log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
         manifest_container_path))
+
+    checkpoint_target = resolve_checkpoint_target(options)
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
     job = batchmodels.JobAddParameter(
@@ -84,7 +90,7 @@ def create_batch_job(job_id, manifest_container_path, pool_id, checkpoint_target
             # set the zoobot saved model checkpoint file path
             batchmodels.EnvironmentSetting(
                 name='ZOOBOT_CHECKPOINT_TARGET',
-                value=os.getenv(checkpoint_target, 'zoobot.ckpt')),
+                value=checkpoint_target),
             # setup error reporting service
             batchmodels.EnvironmentSetting(
                 name='HONEYBADGER_API_KEY',
@@ -176,7 +182,7 @@ def training_job_logs_path(job_id, task_id, suffix):
   return f'{training_job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 
-def create_job_tasks(job_id, task_id=1, run_opts=''):
+def create_job_tasks(job_id, task_id=1, options: Options=Options()):
     # for persisting stdout and stderr log files in container storage
     container_sas_url = batch_jobs.storage_container_sas_url(
         os.getenv('TRAINING_STORAGE_CONTAINER', 'training'))
@@ -220,14 +226,13 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     # train_cmd file path is copied from blob storage into this runtime container
     # so this location is relative to the container paths and can be modified at runtime
     # see jobPreparation task for code setup
-    train_code_path = os.getenv('ZOOBOT_FINETUNE_TRAIN_CMD', 'train_model_finetune_on_catalog.py')
-    # checkpoint file is the base model for finetuning (transfer learning)
-    checkpoint_file = os.getenv('ZOOBOT_FINETUNE_CHECKPOINT_FILE', 'zoobot_pretrained_model.ckpt')
+    train_code_path = resolve_training_script_path(options)
+    checkpoint_path = resolve_pretrained_checkpoint_path(options)
     # setup the training cmd
-    escaped_opts = run_opts.replace('"','\\"')
-    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {escaped_opts} --checkpoint $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/{checkpoint_file} --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/'
+    escaped_opts = options.run_opts.replace('"','\\"')
+    train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {escaped_opts} --checkpoint {checkpoint_path} --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/'
     # and a way to promote the resulting model artifact for use in prediction systems
-    promote_model_code_path = os.getenv('ZOOBOT_PROMOTE_CMD', 'promote_best_checkpoint_to_model.sh')
+    promote_model_code_path = resolve_promote_script_path(options)
     # redirect the stdout to stderr for logging
     promote_checkpoint_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{promote_model_code_path} $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR 2>&1'
     # ensure pytorch has the correct kernel cach path (this enables CUDA JIT - https://pytorch.org/docs/stable/notes/cuda.html#just-in-time-compilation)
@@ -247,7 +252,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
         id=str(task_id),
         command_line=command,
         container_settings=batchmodels.TaskContainerSettings(
-            image_name=os.getenv('CONTAINER_IMAGE_NAME'),
+            image_name=resolve_container_image_name(options),
             working_directory='taskWorkingDirectory',
             container_run_options='--ipc=host'
         ),
