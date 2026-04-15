@@ -1,7 +1,11 @@
 # training job specific functions
 import logging, os, sys
 
-from bajor.batch.checkpoint_strategies import get_checkpoint_target
+from bajor.batch.runtime_config import (
+    resolve_container_image_name,
+    resolve_checkpoint_target,
+    resolve_prediction_script_path,
+)
 
 if os.getenv('DEBUG'):
   import pdb
@@ -11,7 +15,7 @@ import azure.batch.models as batchmodels
 from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
 from bajor.log_config import log
-from bajor.models.job import Options
+from bajor.models.job import JobOptions
 
 # Zoobot Azure Batch predictions pool ID
 predictions_pool_id = os.getenv('POOL_ID', 'predictions_0')
@@ -28,20 +32,20 @@ def get_non_active_batch_job_list():
   return batch_jobs.get_non_active_batch_job_list(predictions_pool_id)
 
 # schedule a training job
-def schedule_job(job_id:str, manifest_url:str, options:Options=Options()):
-    checkpoint_target = get_checkpoint_target(options.workflow_name)
-
+def schedule_job(job_id:str, manifest_url:str, options:JobOptions=JobOptions()):
     submitted_job_id = create_batch_job(
-        job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id, checkpoint_target=checkpoint_target)
+        job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id, options=options)
     job_task_submission_status = create_job_tasks(
-        job_id=job_id, run_opts=options.run_opts)
+        job_id=job_id, options=options)
 
     # return the submitted job_id and task submission status dict
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
 
-def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CHECKPOINT_TARGET'):
+def create_batch_job(job_id, manifest_url, pool_id, options: JobOptions=JobOptions()):
     log.debug('server_job, create_batch_job, using manifest at url: {}'.format(manifest_url))
+
+    checkpoint_target = resolve_checkpoint_target(options)
 
     log.debug(f'BatchJobManager, create_job, job_id: {job_id}')
     job = batchmodels.JobAddParameter(
@@ -73,7 +77,7 @@ def create_batch_job(job_id, manifest_url, pool_id, checkpoint_target='ZOOBOT_CH
             # set the zoobot saved model checkpoint file path
             batchmodels.EnvironmentSetting(
                 name='ZOOBOT_CHECKPOINT_TARGET',
-                value=os.getenv(checkpoint_target, 'zoobot.ckpt')),
+                value=checkpoint_target),
             # setup error reporting service
             batchmodels.EnvironmentSetting(
                 name='HONEYBADGER_API_KEY',
@@ -149,7 +153,7 @@ def job_logs_path(job_id, task_id, suffix):
   return f'{job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 
-def create_job_tasks(job_id, task_id=1, run_opts=''):
+def create_job_tasks(job_id, task_id=1, options: JobOptions=JobOptions()):
     # for persisting stdout and stderr log files in container storage
     container_sas_url = batch_jobs.storage_container_sas_url(
         os.getenv('PREDICTIONS_STORAGE_CONTAINER', 'predictions'))
@@ -186,10 +190,10 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
     tasks = []
     # ZOOBOT command for catalogue predictions!
     # see jobPreparation task for code setup
-    prediction_code_path = os.getenv('ZOOBOT_PREDICTION_CMD', 'predict_catalog_with_model.py')
+    prediction_code_path = resolve_prediction_script_path(options)
     setup_hugging_face_cache_env_var = f'HF_HOME={huggingface_dir}'
     # TODO: perhaps we can add the output file extension as a job env param that can be modified by job runtime params
-    escaped_opts = run_opts.replace('"','\\"')
+    escaped_opts = options.run_opts.replace('"','\\"')
     prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{prediction_code_path} {escaped_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$ZOOBOT_CHECKPOINT_TARGET --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.json'
     # redirect the stdout to stderr for logging
     command = f'/bin/bash -c \"set -ex; {setup_hugging_face_cache_env_var}; python {prediction_cmd}\"'
@@ -200,7 +204,7 @@ def create_job_tasks(job_id, task_id=1, run_opts=''):
         id=str(task_id),
         command_line=command,
         container_settings=batchmodels.TaskContainerSettings(
-            image_name=os.getenv('CONTAINER_IMAGE_NAME'),
+            image_name=resolve_container_image_name(options),
             working_directory='taskWorkingDirectory',
             container_run_options='--ipc=host'
         ),
@@ -239,4 +243,3 @@ if __name__ == '__main__':
         format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
         stream = sys.stdout
     )
-
