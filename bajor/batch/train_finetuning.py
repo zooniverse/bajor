@@ -17,7 +17,7 @@ import azure.batch.models as batchmodels
 from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
 from bajor.log_config import log
-from bajor.models.job import Options
+from bajor.models.job import JobOptions
 
 # Zoobot Azure Batch training pool ID
 training_pool_id = os.getenv('POOL_ID', 'training_1')
@@ -35,7 +35,7 @@ def get_non_active_batch_job_list():
   return batch_jobs.get_non_active_batch_job_list(training_pool_id)
 
 # schedule a training job
-def schedule_job(job_id: str, manifest_path:str, options: Options=Options()):
+def schedule_job(job_id: str, manifest_path:str, options: JobOptions=JobOptions()):
     submitted_job_id = create_batch_job(
         job_id=job_id, manifest_container_path=manifest_path, pool_id=training_pool_id, options=options)
     job_task_submission_status = create_job_tasks(
@@ -44,7 +44,7 @@ def schedule_job(job_id: str, manifest_path:str, options: Options=Options()):
     # return the submitted job_id and task submission status dict
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
-def create_batch_job(job_id, manifest_container_path, pool_id, options: Options=Options()):
+def create_batch_job(job_id, manifest_container_path, pool_id, options: JobOptions=JobOptions()):
     log.debug('server_job, create_batch_job, using manifest from path: {}'.format(
         manifest_container_path))
 
@@ -182,7 +182,7 @@ def training_job_logs_path(job_id, task_id, suffix):
   return f'{training_job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 
-def create_job_tasks(job_id, task_id=1, options: Options=Options()):
+def create_job_tasks(job_id, task_id=1, options: JobOptions=JobOptions()):
     # for persisting stdout and stderr log files in container storage
     container_sas_url = batch_jobs.storage_container_sas_url(
         os.getenv('TRAINING_STORAGE_CONTAINER', 'training'))
@@ -291,4 +291,3 @@ if __name__ == '__main__':
         format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
         stream = sys.stdout
     )
-

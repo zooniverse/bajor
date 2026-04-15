@@ -3,11 +3,11 @@ from bajor.batch.runtime_config import (
     resolve_checkpoint_target,
     resolve_pretrained_checkpoint_path,
 )
-from bajor.models.job import Options
+from bajor.models.job import JobOptions
 
 
 def test_explicit_checkpoint_path_overrides_legacy_checkpoint_target():
-    options = Options(
+    options = JobOptions(
         workflow_name='euclid',
         pretrained_checkpoint_url='jwst/custom.ckpt'
     )
@@ -17,7 +17,7 @@ def test_explicit_checkpoint_path_overrides_legacy_checkpoint_target():
 
 
 def test_blob_url_checkpoint_ref_is_normalized_to_relative_models_path():
-    options = Options(
+    options = JobOptions(
         pretrained_checkpoint_url='https://kadeactivelearning.blob.core.windows.net/models/staging-euclid-zoobot.ckpt'
     )
 
@@ -26,6 +26,6 @@ def test_blob_url_checkpoint_ref_is_normalized_to_relative_models_path():
 
 
 def test_explicit_container_image_name_overrides_env():
-    options = Options(container_image_name='zoobot.azurecr.io/pytorch:custom-jwst')
+    options = JobOptions(container_image_name='zoobot.azurecr.io/pytorch:custom-jwst')
 
     assert resolve_container_image_name(options) == 'zoobot.azurecr.io/pytorch:custom-jwst'

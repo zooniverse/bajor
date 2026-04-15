@@ -15,7 +15,7 @@ import azure.batch.models as batchmodels
 from bajor.batch.client import azure_batch_client
 import bajor.batch.jobs as batch_jobs
 from bajor.log_config import log
-from bajor.models.job import Options
+from bajor.models.job import JobOptions
 
 # Zoobot Azure Batch predictions pool ID
 predictions_pool_id = os.getenv('POOL_ID', 'predictions_0')
@@ -32,7 +32,7 @@ def get_non_active_batch_job_list():
   return batch_jobs.get_non_active_batch_job_list(predictions_pool_id)
 
 # schedule a training job
-def schedule_job(job_id:str, manifest_url:str, options:Options=Options()):
+def schedule_job(job_id:str, manifest_url:str, options:JobOptions=JobOptions()):
     submitted_job_id = create_batch_job(
         job_id=job_id, manifest_url=manifest_url, pool_id=predictions_pool_id, options=options)
     job_task_submission_status = create_job_tasks(
@@ -42,7 +42,7 @@ def schedule_job(job_id:str, manifest_url:str, options:Options=Options()):
     return batch_jobs.job_submission_response(submitted_job_id, job_task_submission_status)
 
 
-def create_batch_job(job_id, manifest_url, pool_id, options: Options=Options()):
+def create_batch_job(job_id, manifest_url, pool_id, options: JobOptions=JobOptions()):
     log.debug('server_job, create_batch_job, using manifest at url: {}'.format(manifest_url))
 
     checkpoint_target = resolve_checkpoint_target(options)
@@ -153,7 +153,7 @@ def job_logs_path(job_id, task_id, suffix):
   return f'{job_dir(job_id)}/task_logs/job_{job_id}_task_{task_id}_{suffix}.txt'
 
 
-def create_job_tasks(job_id, task_id=1, options: Options=Options()):
+def create_job_tasks(job_id, task_id=1, options: JobOptions=JobOptions()):
     # for persisting stdout and stderr log files in container storage
     container_sas_url = batch_jobs.storage_container_sas_url(
         os.getenv('PREDICTIONS_STORAGE_CONTAINER', 'predictions'))
@@ -243,4 +243,3 @@ if __name__ == '__main__':
         format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
         stream = sys.stdout
     )
-
