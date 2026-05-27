@@ -74,6 +74,13 @@ def create_batch_job(job_id, manifest_url, pool_id, options: JobOptions=JobOptio
             batchmodels.EnvironmentSetting(
                 name='PREDICTIONS_JOB_RESULTS_DIR',
                 value=job_results_dir(job_id)),
+            # set the Hugging Face env vars
+            batchmodels.EnvironmentSetting(
+                name='HF_REPO_ID',
+                value=os.getenv('HF_REPO_ID', '')),
+            batchmodels.EnvironmentSetting(
+                name='HF_TOKEN',
+                value=os.getenv('HF_TOKEN', '')),
             # set the zoobot saved model checkpoint file path
             batchmodels.EnvironmentSetting(
                 name='ZOOBOT_CHECKPOINT_TARGET',
