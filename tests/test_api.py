@@ -83,6 +83,7 @@ def test_batch_scheduling_code_is_called(mocked_client):
             'run_opts': run_opts,
             'workflow_name': 'cosmic_dawn',
             'container_image_name': None,
+            'custom_schema_json': None,
             'training_script_path': None,
             'prediction_script_path': None,
             'promote_script_path': None,
