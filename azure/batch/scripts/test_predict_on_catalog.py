@@ -146,6 +146,31 @@ def test_multi_samples_save_predictions_to_json(predictions_for_two_samples):
         os.unlink(save_loc)
 
 
+def test_save_predictions_to_json_with_custom_schema_without_smooth_or_featured(predictions_with_sample_dim):
+
+    id_strs = [str(x) for x in range(len(predictions_with_sample_dim))]
+    label_cols = ['merger_yes', 'merger_no', 'merger_artifact']
+    save_loc = 'temp.json'
+    predict_on_catalog.save_predictions_to_json(predictions_with_sample_dim, id_strs, label_cols, save_loc)
+    # process the saved results file for testing
+    with open(save_loc, 'r') as f:
+        saved_preds = json.load(f)
+    try:
+        subject_id = '0'
+        sample_num = '0'
+        assert saved_preds['schema']['data']['subject_id']['sample_num'][0] == 'merger_yes_expectation'
+        assert saved_preds['schema']['data']['subject_id']['sample_num'][1] == [
+            'merger_yes_prediction',
+            'merger_no_prediction',
+            'merger_artifact_prediction'
+        ]
+        assert saved_preds['data'][subject_id][sample_num][0] == 0.6957
+        assert saved_preds['data'][subject_id][sample_num][1] == [8.0, 2.0, 1.5]
+    finally:
+        # cleanup the test file artefact
+        os.unlink(save_loc)
+
+
 def test_predictions_to_bounds(predictions_with_sample_dim, odds_below_bound_with_sample_dim):
 
     smooth_or_featured_start_and_end_indices = [0, 2]

@@ -5,6 +5,7 @@ class JobOptions(BaseModel):
     run_opts: str = ""
     workflow_name: str = 'cosmic_dawn'
     container_image_name: Optional[str] = None
+    custom_schema_json: Optional[str] = None
     training_script_path: Optional[str] = None
     prediction_script_path: Optional[str] = None
     promote_script_path: Optional[str] = None

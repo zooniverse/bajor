@@ -8,8 +8,59 @@ from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
 from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
 from zoobot.pytorch.training import finetune
-from zoobot.shared.schemas import cosmic_dawn_ortho_schema, euclid_ortho_schema, gz_jwst_schema
+from schema_resolver import load_schema
 from train_on_catalog import TrainingGalaxyDataModule
+
+
+def huggingface_config():
+    repo_id = os.getenv('HF_REPO_ID')
+    token = os.getenv('HF_TOKEN')
+
+    if repo_id and token:
+        return repo_id, token
+
+    return None, None
+
+
+def checkpoint_filename(hf_filename, checkpoint_path):
+    return hf_filename or os.path.basename(checkpoint_path)
+
+
+def resolve_checkpoint_path(checkpoint_path, hf_filename):
+    repo_id, token = huggingface_config()
+    if not repo_id:
+        return checkpoint_path
+
+    from huggingface_hub import hf_hub_download
+
+    filename = checkpoint_filename(hf_filename, checkpoint_path)
+    resolved_checkpoint_path = hf_hub_download(
+        repo_id=repo_id,
+        filename=filename,
+        token=token
+    )
+    logging.info(f'Loaded Hugging Face checkpoint from: {resolved_checkpoint_path}')
+    return resolved_checkpoint_path
+
+
+def upload_checkpoint_to_huggingface(checkpoint_path, hf_filename, job_id):
+    repo_id, token = huggingface_config()
+    if not repo_id:
+        return
+
+    from huggingface_hub import upload_file
+
+    upload_file(
+        path_or_fileobj=checkpoint_path,
+        path_in_repo=hf_filename,
+        repo_id=repo_id,
+        repo_type="model",
+        token=token,
+        commit_message=f"Upload best checkpoint for {job_id}",
+    )
+    logging.info(f'Uploaded checkpoint to Hugging Face: {repo_id}/{hf_filename}')
+
+
 if __name__ == '__main__':
 
     logging.basicConfig(
@@ -24,7 +75,7 @@ if __name__ == '__main__':
     # expects path to csv
     parser.add_argument('--catalog', dest='catalog_loc', type=str, required=True)
     parser.add_argument('--checkpoint', dest='checkpoint', type=str, required=True)
-    parser.add_argument('--schema', dest='schema', type=str, default='cosmic_dawn')
+    parser.add_argument('--schema', dest='schema', type=str, default=None)
     parser.add_argument('--num-workers', dest='num_workers', type=int, default=int(os.cpu_count()))  # benchmarks show 4 work on our VM types - was int((os.cpu_count())
     parser.add_argument('--prefetch-factor', dest='prefetch_factor', type=int, default=9) # benchmarks show 9 works on our VM types (lots of ram) - was 4 (default)
     parser.add_argument('--batch-size', dest='batch_size', default=10, type=int) # benchmarks show 10 works on our new VM type - was 128 (default)
@@ -41,14 +92,11 @@ if __name__ == '__main__':
     parser.add_argument('--erase-iterations', dest='erase_iterations', type=int, default=0)
     parser.add_argument('--fixed-crop', dest='fixed_crop', type=str, default=None)
     parser.add_argument('--n-blocks', dest='n_blocks', type=int, default=0)
+    parser.add_argument('--hf-filename', dest='hf_filename', type=str, default=None)
+    parser.add_argument('--custom-schema-json', dest='custom_schema_json', type=str, default=None)
     args = parser.parse_args()
 
-    schema_dict = {
-        'cosmic_dawn': cosmic_dawn_ortho_schema,
-        'euclid': euclid_ortho_schema,
-        'jwst_cosmos': gz_jwst_schema
-    }
-    schema = schema_dict.get(args.schema, cosmic_dawn_ortho_schema)
+    schema = load_schema(args.schema, custom_schema_json=args.custom_schema_json)
     # setup the error reporting tool - https://app.honeybadger.io/projects/
     honeybadger_api_key = os.getenv('HONEYBADGER_API_KEY')
     if honeybadger_api_key:
@@ -118,13 +166,15 @@ if __name__ == '__main__':
         logger = None
 
 
+    checkpoint_path = resolve_checkpoint_path(args.checkpoint, args.hf_filename)
+
     # load the model from checkpoint
-    model = finetune.FinetuneableZoobotTree(
+    model = finetune.FinetuneableZoobotTree.load_from_checkpoint(
+        checkpoint_path,
         # params specific to tree finetuning
         schema=schema,
         n_blocks=args.n_blocks,
-        # zoobot_checkpoint_loc=args.checkpoint
-        name='hf_hub:mwalmsley/zoobot-encoder-convnext_nano'
+        zoobot_checkpoint_loc=checkpoint_path
     )
 
     trainer = finetune.get_trainer(
@@ -143,5 +193,10 @@ if __name__ == '__main__':
     trainer.fit(model, datamodule)
 
     best_checkpoint_path = trainer.checkpoint_callback.best_model_path
+    upload_checkpoint_to_huggingface(
+        checkpoint_path=best_checkpoint_path,
+        hf_filename=checkpoint_filename(args.hf_filename, args.checkpoint),
+        job_id=os.environ.get("AZ_BATCH_JOB_ID", "DEV")
+    )
     logging.info(
         f'Finished training on catalog - checkpoint save to: {best_checkpoint_path}')

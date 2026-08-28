@@ -1,4 +1,5 @@
 import os
+import shlex
 from urllib.parse import urlparse
 
 from bajor.batch.checkpoint_strategies import get_checkpoint_target
@@ -51,3 +52,30 @@ def resolve_promote_script_path(options: JobOptions) -> str:
 
 def resolve_container_image_name(options: JobOptions) -> str:
     return options.container_image_name or os.getenv('CONTAINER_IMAGE_NAME')
+
+
+def build_run_opts(options: JobOptions, include_schema: bool = True) -> str:
+    run_opts = options.run_opts.strip()
+    generated_opts = []
+
+    if include_schema and options.workflow_name and not _has_schema_arg(run_opts):
+        generated_opts.append(f'--schema {options.workflow_name.lower()}')
+
+    if options.custom_schema_json and not _has_custom_schema_arg(run_opts):
+        generated_opts.append(f'--custom-schema-json {shlex.quote(options.custom_schema_json)}')
+
+    return ' '.join([*generated_opts, run_opts]).strip()
+
+
+def _has_schema_arg(run_opts: str) -> bool:
+    try:
+        return '--schema' in shlex.split(run_opts)
+    except ValueError:
+        return '--schema' in run_opts.split()
+
+
+def _has_custom_schema_arg(run_opts: str) -> bool:
+    try:
+        return '--custom-schema-json' in shlex.split(run_opts)
+    except ValueError:
+        return '--custom-schema-json' in run_opts.split()

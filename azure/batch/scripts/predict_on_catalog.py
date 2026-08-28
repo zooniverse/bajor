@@ -121,7 +121,7 @@ class PredictionGalaxyDataModule(galaxy_datamodule.GalaxyDataModule):
         )
 
 
-def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], label_cols: List[str], save_loc: str):
+def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], label_cols: List[str], save_loc: str, schema=None):
     """
     JSON output format is used for services like the zooniverse subject assistant
     Could add any other decision rules into this function
@@ -138,6 +138,32 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
     assert predictions.ndim == 3
 
     assert save_loc.endswith('.json')
+
+    try:
+        smooth_or_featured_indices, featured_index = featured_answer_selection(label_cols, schema)
+        save_featured_predictions_to_json(
+            predictions,
+            image_ids,
+            label_cols,
+            save_loc,
+            smooth_or_featured_indices,
+            featured_index
+        )
+    except ValueError as e:
+        logging.info(f'{e}. Saving generic custom schema predictions.')
+        save_generic_predictions_to_json(predictions, image_ids, label_cols, save_loc)
+
+
+def save_featured_predictions_to_json(
+    predictions: np.ndarray,
+    image_ids: List[str],
+    label_cols: List[str],
+    save_loc: str,
+    smooth_or_featured_indices: List[int],
+    featured_index: int
+):
+    smooth_or_featured_labels = label_cols[smooth_or_featured_indices[0]:smooth_or_featured_indices[1] + 1]
+
     # setup the output data structure with a schema describing the data
     output_data = {
       'schema': {
@@ -147,7 +173,7 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
             'subject_id': {
                 "sample_num": [
                     'probability_at_least_20pc_featured',
-                    ['smooth-or-featured-cd_smooth_prediction', 'smooth-or-featured-cd_featured-or-disk_prediction', 'smooth-or-featured-cd_problem_prediction']
+                    [f'{label}_prediction' for label in smooth_or_featured_labels]
                 ]
             }
         }
@@ -156,19 +182,9 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
       'data': {}
     }
 
-    # check that the predictions mean what we think they mean
-    assert label_cols[0] == 'smooth-or-featured-cd_smooth', 'column label 0 is not "smooth-or-featured-cd_smooth" label'
-    assert label_cols[1] == 'smooth-or-featured-cd_featured-or-disk', 'column label 1 is not "smooth-or-featured-cd_featured-or-disk" label'
-    assert label_cols[2] == 'smooth-or-featured-cd_problem', 'column label 2 is not "smooth-or-featured-cd_problem" label'
-    # okay, now it's safe to hardcode the values below
-
     # only derive each galaxies smooth or features question right now for simplicity of metric
     # i.e. we're trying to figure out if this galaxy is interesting or not for human volunteers
     # if it's not featured it's not interesting so we can use this metric to decide to show it to volunteers
-    smooth_or_featured_start_and_end_indices = [0, 2]
-
-    # the featured answer label index
-    smooth_or_featured_featured_index = 1
 
     # upper bound of volunteers answering for a feature, i.e. no more than e.g. 20% of volunteers select the answer (here, featured)
     # allow this value to be set via the ENV variable with a fallback setting (0.2) that can be changed in code as needed.
@@ -176,8 +192,8 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
 
     # currently, probability volunteers would give featured vote fraction below 20%
     probability_volunteers_say_featured_below_bound = odds_answer_below_bounds(predictions,
-        smooth_or_featured_start_and_end_indices,
-        smooth_or_featured_featured_index,
+        smooth_or_featured_indices,
+        featured_index,
         featured_upper_bound
     )
 
@@ -192,9 +208,13 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
 
     # also record the predictions themselves, for debugging and subject tracking
     # any probabilities can be derived from the predictions post-hoc if needed
-    # predictions[n, :3] slices out predictions for the nth galaxy and the 0 to 2nd questions i.e. smooth/featured/problem
-    # (could generalise to e.g. smooth_or_featured_start_and_end_indices[0]:smooth_or_featured_start_and_end_indices[0]+1], but overcomplicated I think)
-    prediction_data = [ np.round(predictions[n, :3], decimals=3).tolist() for n in range(len(predictions)) ]
+    prediction_data = [
+        np.round(
+            predictions[n, smooth_or_featured_indices[0]:smooth_or_featured_indices[1] + 1],
+            decimals=3
+        ).tolist()
+        for n in range(len(predictions))
+    ]
 
     # add the prediction data to the output data dict
     for image_id_offset in range(len(image_ids)):
@@ -227,8 +247,60 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
     with open(save_loc, 'w') as out_file:
         json.dump(output_data, out_file)
 
+
+def save_generic_predictions_to_json(predictions: np.ndarray, image_ids: List[str], label_cols: List[str], save_loc: str):
+    question_indices = primary_question_indices(label_cols)
+    answer_index = question_indices[0]
+    selected_labels = label_cols[question_indices[0]:question_indices[1] + 1]
+    score_label = label_cols[answer_index]
+
+    score_data = predictions_to_expectation_of_answer(predictions, question_indices, answer_index)
+    prediction_data = [
+        np.round(
+            predictions[n, question_indices[0]:question_indices[1] + 1],
+            decimals=3
+        ).tolist()
+        for n in range(len(predictions))
+    ]
+
+    output_data = {
+      'schema': {
+        'version': 1,
+        'type': 'zooniverse/subject_assistant',
+        'data': {
+            'subject_id': {
+                "sample_num": [
+                    f'{score_label}_expectation',
+                    [f'{label}_prediction' for label in selected_labels]
+                ]
+            }
+        }
+      },
+      'data': {}
+    }
+
+    for image_id_offset in range(len(image_ids)):
+        image_id_results = {}
+        num_samples = len(prediction_data[image_id_offset][0])
+
+        for num_sample in range(num_samples):
+            prediction_data_for_sample = []
+            for predictions_for_label in prediction_data[image_id_offset]:
+                prediction_data_for_sample.append(predictions_for_label[num_sample])
+
+            image_id_results[num_sample] = [
+                float(np.round(score_data[image_id_offset][num_sample], 4)),
+                prediction_data_for_sample
+            ]
+
+        subject_id = image_ids[image_id_offset]
+        output_data['data'][subject_id] = image_id_results
+
+    with open(save_loc, 'w') as out_file:
+        json.dump(output_data, out_file)
+
 # note - this is pretty much a copy of zoobot code, it might be possible to just import it(also overrides the model predict_step to process subject ids)
-def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs):
+def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, label_cols: List, save_loc: str, datamodule_kwargs, trainer_kwargs, schema=None):
     predict_datamodule = PredictionGalaxyDataModule(
         label_cols=None, # we don't need the labels for predictions
         predict_catalog=catalog,  # no need to specify the other catalogs
@@ -285,7 +357,7 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     elif save_loc.endswith('.hdf5'):
         save_predictions.predictions_to_hdf5(predictions, image_id_strs, label_cols, save_loc)
     elif save_loc.endswith('.json'):
-        save_predictions_to_json(predictions, image_id_strs, label_cols, save_loc)
+        save_predictions_to_json(predictions, image_id_strs, label_cols, save_loc, schema)
     else:
         logging.warning('Save format of {} not recognised - assuming csv'.format(save_loc))
         save_predictions.predictions_to_csv(predictions, image_id_strs, label_cols, save_loc)
@@ -295,6 +367,58 @@ def predict(catalog: pd.DataFrame, model: pl.LightningModule, n_samples: int, la
     end = datetime.datetime.fromtimestamp(time.time())
     logging.info('Completed at: {}'.format(end.strftime('%Y-%m-%d %H:%M:%S')))
     logging.info('Time elapsed: {}'.format(end - start))
+
+
+def featured_answer_selection(label_cols: List[str], schema=None):
+    question_indices = smooth_or_featured_question_indices(label_cols, schema)
+
+    for label_index in range(question_indices[0], question_indices[1] + 1):
+        if label_cols[label_index].endswith('_featured-or-disk'):
+            return question_indices, label_index
+
+    raise ValueError('smooth-or-featured question must include a featured-or-disk answer')
+
+
+def smooth_or_featured_question_indices(label_cols: List[str], schema=None):
+    if schema is not None:
+        for question in schema.questions:
+            if question.text.startswith('smooth-or-featured'):
+                return [question.start_index, question.end_index]
+
+    featured_label = next(
+        (
+            label
+            for label in label_cols
+            if label.startswith('smooth-or-featured') and label.endswith('_featured-or-disk')
+        ),
+        None
+    )
+
+    if featured_label is None:
+        raise ValueError('schema must include a smooth-or-featured featured-or-disk answer')
+
+    question_prefix = featured_label.rsplit('_', 1)[0]
+    question_indices = [
+        index
+        for index, label in enumerate(label_cols)
+        if label.startswith(f'{question_prefix}_')
+    ]
+
+    return [min(question_indices), max(question_indices)]
+
+
+def primary_question_indices(label_cols: List[str]):
+    if not label_cols:
+        raise ValueError('label_cols must not be empty')
+
+    question_prefix = label_cols[0].rsplit('_', 1)[0]
+    question_indices = [
+        index
+        for index, label in enumerate(label_cols)
+        if label.startswith(f'{question_prefix}_')
+    ]
+
+    return [min(question_indices), max(question_indices)]
 
 
 def predictions_to_expectation_of_answer(predictions: np.ndarray, question_indices: List[int], answer_index: int) -> np.ndarray:
