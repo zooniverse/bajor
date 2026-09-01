@@ -2,6 +2,7 @@
 import logging, os, sys
 
 from bajor.batch.runtime_config import (
+    build_run_opts,
     resolve_container_image_name,
     resolve_checkpoint_target,
     resolve_prediction_script_path,
@@ -198,9 +199,9 @@ def create_job_tasks(job_id, task_id=1, options: JobOptions=JobOptions()):
     # ZOOBOT command for catalogue predictions!
     # see jobPreparation task for code setup
     prediction_code_path = resolve_prediction_script_path(options)
-    setup_hugging_face_cache_env_var = f'HF_HOME={huggingface_dir}'
+    setup_hugging_face_cache_env_var = f'export HF_HOME={huggingface_dir}'
     # TODO: perhaps we can add the output file extension as a job env param that can be modified by job runtime params
-    escaped_opts = options.run_opts.replace('"','\\"')
+    escaped_opts = build_run_opts(options, include_schema=False).replace('"','\\"')
     prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{prediction_code_path} {escaped_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$ZOOBOT_CHECKPOINT_TARGET --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.json'
     # redirect the stdout to stderr for logging
     command = f'/bin/bash -c \"set -ex; {setup_hugging_face_cache_env_var}; python {prediction_cmd}\"'

@@ -8,12 +8,45 @@ import pytorch_lightning as pl
 
 from zoobot.pytorch.training import finetune
 import predict_on_catalog
-from galaxy_datasets.shared import label_metadata
+from schema_resolver import load_schema
 from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
-def load_model_from_checkpoint(checkpoint_path):
-    logging.info('Returning model from checkpoint: {}'.format(checkpoint_path))
-    return finetune.FinetuneableZoobotTree.load_from_checkpoint(checkpoint_path)
+
+def huggingface_config():
+    repo_id = os.getenv('HF_REPO_ID')
+    token = os.getenv('HF_TOKEN')
+
+    if repo_id and token:
+        return repo_id, token
+
+    return None, None
+
+
+def checkpoint_filename(hf_filename, checkpoint_path):
+    return hf_filename or os.path.basename(checkpoint_path)
+
+
+def resolve_checkpoint_path(checkpoint_path, hf_filename):
+    repo_id, token = huggingface_config()
+    if not repo_id:
+        return checkpoint_path
+
+    from huggingface_hub import hf_hub_download
+
+    filename = checkpoint_filename(hf_filename, checkpoint_path)
+    resolved_checkpoint_path = hf_hub_download(
+        repo_id=repo_id,
+        filename=filename,
+        token=token
+    )
+    logging.info(f'Loaded Hugging Face checkpoint from: {resolved_checkpoint_path}')
+    return resolved_checkpoint_path
+
+
+def load_model_from_checkpoint(checkpoint_path, hf_filename=None):
+    resolved_checkpoint_path = resolve_checkpoint_path(checkpoint_path, hf_filename)
+    logging.info('Returning model from checkpoint: {}'.format(resolved_checkpoint_path))
+    return finetune.FinetuneableZoobotTree.load_from_checkpoint(resolved_checkpoint_path)
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -23,6 +56,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--checkpoint-path', dest='checkpoint_path', type=str, required=True)
+    parser.add_argument('--hf-filename', dest='hf_filename', type=str, default=None)
     parser.add_argument('--save-path', dest='save_loc', type=str, required=True)
     parser.add_argument('--catalog-url', dest='catalog_url', type=str, required=True)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=1)
@@ -34,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--devices', default=1, type=int)
     parser.add_argument('--erase-iterations', dest='erase_iterations', type=int, default=0)
     parser.add_argument('--fixed-crop', dest='fixed_crop', type=str, default=None)
+    parser.add_argument('--custom-schema-json', dest='custom_schema_json', type=str, default=None)
     args = parser.parse_args()
 
     # setup the error reporting tool - https://app.honeybadger.io/projects/
@@ -58,7 +93,9 @@ if __name__ == '__main__':
     # add in the image url as it's used in the
     catalog['image_url'] = raw_json_catalog[0]
 
-    model = load_model_from_checkpoint(args.checkpoint_path)
+    schema = load_schema(None, custom_schema_json=args.custom_schema_json)
+
+    model = load_model_from_checkpoint(args.checkpoint_path, args.hf_filename)
 
     transform = None
     try:
@@ -90,10 +127,10 @@ if __name__ == '__main__':
         catalog=catalog,
         save_loc=args.save_loc,
         n_samples=args.num_samples,
-        label_cols=label_metadata.cosmic_dawn_ortho_label_cols,
+        label_cols=schema.label_cols,
+        schema=schema,
         datamodule_kwargs=datamodule_args,
         trainer_kwargs=trainer_args
     )
-
 
 

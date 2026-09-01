@@ -2,6 +2,7 @@
 import logging, os, sys
 
 from bajor.batch.runtime_config import (
+    build_run_opts,
     resolve_container_image_name,
     resolve_checkpoint_target,
     resolve_pretrained_checkpoint_path,
@@ -236,7 +237,7 @@ def create_job_tasks(job_id, task_id=1, options: JobOptions=JobOptions()):
     train_code_path = resolve_training_script_path(options)
     checkpoint_path = resolve_pretrained_checkpoint_path(options)
     # setup the training cmd
-    escaped_opts = options.run_opts.replace('"','\\"')
+    escaped_opts = build_run_opts(options).replace('"','\\"')
     train_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{train_code_path} {escaped_opts} --checkpoint {checkpoint_path} --catalog $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$MANIFEST_PATH --save-dir $AZ_BATCH_NODE_MOUNTS_DIR/$TRAINING_CONTAINER_MOUNT_DIR/$TRAINING_JOB_RESULTS_DIR/'
     # and a way to promote the resulting model artifact for use in prediction systems
     promote_model_code_path = resolve_promote_script_path(options)
