@@ -38,6 +38,12 @@ jobs:
             --account-name kadeactivelearning \
             --container-name 'training' \
             --overwrite true \
+            --name 'code/schema_resolver.py' \
+            --file './azure/batch/scripts/schema_resolver.py'
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'training' \
+            --overwrite true \
             --name 'code/promote_best_checkpoint_to_model.sh' \
             --file './azure/batch/scripts/promote_best_checkpoint_to_model.sh'
           az storage blob upload \
@@ -52,3 +58,9 @@ jobs:
             --overwrite true \
             --name 'code/predict_catalog_with_model.py' \
             --file './azure/batch/scripts/predict_catalog_with_model.py'
+          az storage blob upload \
+            --account-name kadeactivelearning \
+            --container-name 'predictions' \
+            --overwrite true \
+            --name 'code/schema_resolver.py' \
+            --file './azure/batch/scripts/schema_resolver.py'
