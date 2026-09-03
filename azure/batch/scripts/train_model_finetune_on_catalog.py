@@ -26,7 +26,16 @@ def checkpoint_filename(hf_filename, checkpoint_path):
     return hf_filename or os.path.basename(checkpoint_path)
 
 
-def resolve_checkpoint_path(checkpoint_path, hf_filename):
+def missing_huggingface_checkpoint(error):
+    status_code = getattr(getattr(error, 'response', None), 'status_code', None)
+    return status_code == 404 or error.__class__.__name__ in [
+        'EntryNotFoundError',
+        'RepositoryNotFoundError',
+        'RevisionNotFoundError'
+    ]
+
+
+def resolve_checkpoint_path(checkpoint_path, hf_filename, allow_missing=False):
     repo_id, token = huggingface_config()
     if not repo_id:
         return checkpoint_path
@@ -34,11 +43,18 @@ def resolve_checkpoint_path(checkpoint_path, hf_filename):
     from huggingface_hub import hf_hub_download
 
     filename = checkpoint_filename(hf_filename, checkpoint_path)
-    resolved_checkpoint_path = hf_hub_download(
-        repo_id=repo_id,
-        filename=filename,
-        token=token
-    )
+    try:
+        resolved_checkpoint_path = hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            token=token
+        )
+    except Exception as error:
+        if allow_missing and missing_huggingface_checkpoint(error):
+            logging.warning(f'Hugging Face checkpoint not found: {repo_id}/{filename}')
+            return None
+        raise
+
     logging.info(f'Loaded Hugging Face checkpoint from: {resolved_checkpoint_path}')
     return resolved_checkpoint_path
 
@@ -59,6 +75,27 @@ def upload_checkpoint_to_huggingface(checkpoint_path, hf_filename, job_id):
         commit_message=f"Upload best checkpoint for {job_id}",
     )
     logging.info(f'Uploaded checkpoint to Hugging Face: {repo_id}/{hf_filename}')
+
+
+def fresh_finetune_model(schema, n_blocks):
+    logging.info('Using a fresh Zoobot model with a schema-specific head.')
+    return finetune.FinetuneableZoobotTree(
+        name='hf_hub:mwalmsley/zoobot-encoder-convnext_nano',
+        schema=schema,
+        n_blocks=n_blocks
+    )
+
+
+def load_finetune_model(checkpoint_path, schema, n_blocks, custom_schema_json):
+    if checkpoint_path is None:
+        return fresh_finetune_model(schema, n_blocks)
+
+    return finetune.FinetuneableZoobotTree.load_from_checkpoint(
+        checkpoint_path,
+        schema=schema,
+        n_blocks=n_blocks,
+        zoobot_checkpoint_loc=checkpoint_path
+    )
 
 
 if __name__ == '__main__':
@@ -166,15 +203,18 @@ if __name__ == '__main__':
         logger = None
 
 
-    checkpoint_path = resolve_checkpoint_path(args.checkpoint, args.hf_filename)
+    checkpoint_path = resolve_checkpoint_path(
+        args.checkpoint,
+        args.hf_filename,
+        allow_missing=bool(args.custom_schema_json)
+    )
 
     # load the model from checkpoint
-    model = finetune.FinetuneableZoobotTree.load_from_checkpoint(
+    model = load_finetune_model(
         checkpoint_path,
-        # params specific to tree finetuning
-        schema=schema,
-        n_blocks=args.n_blocks,
-        zoobot_checkpoint_loc=checkpoint_path
+        schema,
+        args.n_blocks,
+        args.custom_schema_json
     )
 
     trainer = finetune.get_trainer(
