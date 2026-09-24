@@ -141,7 +141,7 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
 
     try:
         smooth_or_featured_indices, featured_index = featured_answer_selection(label_cols, schema)
-        save_featured_predictions_to_json(
+        save_predictions_with_featured_score_to_json(
             predictions,
             image_ids,
             label_cols,
@@ -154,7 +154,7 @@ def save_predictions_to_json(predictions: np.ndarray, image_ids: List[str], labe
         save_generic_predictions_to_json(predictions, image_ids, label_cols, save_loc)
 
 
-def save_featured_predictions_to_json(
+def save_predictions_with_featured_score_to_json(
     predictions: np.ndarray,
     image_ids: List[str],
     label_cols: List[str],
@@ -162,8 +162,6 @@ def save_featured_predictions_to_json(
     smooth_or_featured_indices: List[int],
     featured_index: int
 ):
-    smooth_or_featured_labels = label_cols[smooth_or_featured_indices[0]:smooth_or_featured_indices[1] + 1]
-
     # setup the output data structure with a schema describing the data
     output_data = {
       'schema': {
@@ -173,7 +171,7 @@ def save_featured_predictions_to_json(
             'subject_id': {
                 "sample_num": [
                     'probability_at_least_20pc_featured',
-                    [f'{label}_prediction' for label in smooth_or_featured_labels]
+                    [f'{label}_prediction' for label in label_cols]
                 ]
             }
         }
@@ -210,7 +208,7 @@ def save_featured_predictions_to_json(
     # any probabilities can be derived from the predictions post-hoc if needed
     prediction_data = [
         np.round(
-            predictions[n, smooth_or_featured_indices[0]:smooth_or_featured_indices[1] + 1],
+            predictions[n],
             decimals=3
         ).tolist()
         for n in range(len(predictions))
