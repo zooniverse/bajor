@@ -87,7 +87,23 @@ def test_batch_scheduling_code_is_called(mocked_client):
             'training_script_path': None,
             'prediction_script_path': None,
             'promote_script_path': None,
-            'pretrained_checkpoint_url': None
+            'pretrained_checkpoint_url': None,
+            'huggingface_checkpoint_filename': None
         },
         'status': {"status": "started", "message": "Job submitted successfully"}
     }
+
+
+@pytest.mark.parametrize('endpoint,module,manifest', [
+    ('training', 'bajor.batch.train_finetuning', {'manifest_path': 'manifest.csv'}),
+    ('prediction', 'bajor.batch.predictions', {'manifest_url': 'https://example.com/manifest.json'}),
+])
+def test_huggingface_options_reach_scheduler(mocked_client, endpoint, module, manifest):
+    options = {'huggingface_checkpoint_filename': 'checkpoints/best.ckpt'}
+    with mock.patch.multiple(module, schedule_job=mock.DEFAULT, active_jobs_running=mock.DEFAULT) as batch:
+        batch['active_jobs_running'].return_value = False
+        batch['schedule_job'].return_value = {'submitted_job_id': submitted_job_id, 'job_task_status': 'started'}
+        response = mocked_client.post(f'/{endpoint}/jobs/', auth=('bajor', 'bajor'), json={**manifest, 'opts': options})
+        assert response.status_code == 201
+        scheduled_options = batch['schedule_job'].call_args.args[2]
+        assert scheduled_options.huggingface_checkpoint_filename == options['huggingface_checkpoint_filename']
