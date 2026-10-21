@@ -58,6 +58,9 @@ def build_run_opts(options: JobOptions, include_schema: bool = True) -> str:
     run_opts = options.run_opts.strip()
     generated_opts = []
 
+    if options.huggingface_checkpoint_filename:
+        generated_opts.append(f'--hf-filename {shlex.quote(options.huggingface_checkpoint_filename)}')
+
     if include_schema and options.workflow_name and not _has_schema_arg(run_opts):
         generated_opts.append(f'--schema {options.workflow_name.lower()}')
 
