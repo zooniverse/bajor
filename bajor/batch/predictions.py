@@ -1,5 +1,6 @@
 # training job specific functions
 import logging, os, sys
+import shlex
 
 from bajor.batch.runtime_config import (
     build_run_opts,
@@ -201,7 +202,8 @@ def create_job_tasks(job_id, task_id=1, options: JobOptions=JobOptions()):
     prediction_code_path = resolve_prediction_script_path(options)
     setup_hugging_face_cache_env_var = f'export HF_HOME={huggingface_dir}'
     # TODO: perhaps we can add the output file extension as a job env param that can be modified by job runtime params
-    escaped_opts = build_run_opts(options, include_schema=False).replace('"','\\"')
+    run_opts = f'{build_run_opts(options, include_schema=False)} --workflow-name {shlex.quote(options.workflow_name)}'
+    escaped_opts = run_opts.replace('"','\\"')
     prediction_cmd = f'$AZ_BATCH_NODE_SHARED_DIR/{prediction_code_path} {escaped_opts} --checkpoint-path $AZ_BATCH_NODE_MOUNTS_DIR/$MODELS_CONTAINER_MOUNT_DIR/$ZOOBOT_CHECKPOINT_TARGET --catalog-url $MANIFEST_URL --save-path $AZ_BATCH_NODE_MOUNTS_DIR/$PREDICTIONS_CONTAINER_MOUNT_DIR/$PREDICTIONS_JOB_RESULTS_DIR/predictions.json'
     # redirect the stdout to stderr for logging
     command = f'/bin/bash -c \"set -ex; {setup_hugging_face_cache_env_var}; python {prediction_cmd}\"'

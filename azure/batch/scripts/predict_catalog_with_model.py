@@ -11,6 +11,8 @@ import predict_on_catalog
 from schema_resolver import load_schema
 from galaxy_datasets.transforms import default_view_config, GalaxyViewTransform
 
+HUGGINGFACE_PREDICTION_OUTPUT_EXTENSIONS = ('.csv', '.json')
+
 
 def huggingface_config():
     repo_id = os.getenv('HF_REPO_ID')
@@ -20,6 +22,40 @@ def huggingface_config():
         return repo_id, token
 
     return None, None
+
+
+def prediction_results_path_in_repo(save_loc, workflow_name):
+    return f'predictions/{workflow_name}{os.path.splitext(save_loc)[1]}'
+
+
+def upload_prediction_results_to_huggingface(save_loc, workflow_name):
+    if not save_loc.endswith(HUGGINGFACE_PREDICTION_OUTPUT_EXTENSIONS):
+        return
+
+    repo_id, token = huggingface_config()
+    if not repo_id:
+        return
+
+    if not workflow_name:
+        logging.warning('Skipping Hugging Face prediction upload: --workflow-name is not set.')
+        return
+
+    job_id = os.environ.get('AZ_BATCH_JOB_ID', 'DEV')
+    path_in_repo = prediction_results_path_in_repo(save_loc, workflow_name)
+
+    try:
+        from huggingface_hub import upload_file
+
+        upload_file(
+            path_or_fileobj=save_loc,
+            path_in_repo=path_in_repo,
+            repo_id=repo_id,
+            repo_type='model',
+            token=token,
+            commit_message=f'Upload prediction results for {job_id}',
+        )
+    except Exception:
+        pass
 
 
 def checkpoint_filename(hf_filename, checkpoint_path):
@@ -57,6 +93,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--checkpoint-path', dest='checkpoint_path', type=str, required=True)
     parser.add_argument('--hf-filename', dest='hf_filename', type=str, default=None)
+    parser.add_argument('--workflow-name', dest='workflow_name', type=str, default=None)
     parser.add_argument('--save-path', dest='save_loc', type=str, required=True)
     parser.add_argument('--catalog-url', dest='catalog_url', type=str, required=True)
     parser.add_argument('--num-samples', dest='num_samples', type=int, default=1)
@@ -133,4 +170,4 @@ if __name__ == '__main__':
         trainer_kwargs=trainer_args
     )
 
-
+    upload_prediction_results_to_huggingface(args.save_loc, args.workflow_name)

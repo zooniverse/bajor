@@ -10,6 +10,7 @@ class JobOptions(BaseModel):
     prediction_script_path: Optional[str] = None
     promote_script_path: Optional[str] = None
     pretrained_checkpoint_url: Optional[str] = None
+    huggingface_checkpoint_filename: Optional[str] = None
 
 
 class TrainingJob(BaseModel):
